@@ -1,8 +1,29 @@
-import { Outlet } from "react-router";
-import { Home, User, ShoppingCart } from "lucide-react"; // 아이콘 라이브러리
+import { useEffect } from "react";
+import { Outlet, useLoaderData } from "react-router";
+import { type LoaderFunctionArgs, json } from "@remix-run/node";
+import { Home, User, ShoppingCart } from "lucide-react";
+import { Toaster } from "~/components/ui/sonner";
+import { toast } from "sonner"; // 👈 toast 함수 import
+import { getSession, commitSession } from "~/lib/session.server"; // 👈 세션 유틸리티 import
 
-// pnpm add lucide-react 명령어로 아이콘을 설치해주세요!
-// 위 import 문을 사용하기 전에 터미널에서 pnpm add lucide-react 를 실행해야 합니다.
+type LoaderData = {
+  toastMessage: {
+    type: "success" | "error";
+    message: string;
+  } | null; // toastMessage는 객체이거나 null일 수 있습니다.
+};
+
+// 2. loader 함수가 LoaderData 타입을 반환하도록 명시합니다.
+export const loader = async ({ request }: LoaderFunctionArgs): Promise<Response> => {
+  const session = await getSession(request.headers.get("Cookie"));
+  const toastMessage = session.get("toast") || null;
+
+  const data: LoaderData = { toastMessage };
+
+  return json(data, {
+    headers: { "Set-Cookie": await commitSession(session) },
+  });
+};
 
 function Header() {
   return (
@@ -36,6 +57,15 @@ function BottomNav() {
 }
 
 export default function MobileLayout() {
+  const { toastMessage } = useLoaderData<LoaderData>();
+  useEffect(() => {
+    if (toastMessage) {
+      if (toastMessage.type === 'success') {
+        toast.success(toastMessage.message);
+      }
+      // 추후 error, info 등 다른 타입의 토스트도 추가할 수 있습니다.
+    }
+  }, [toastMessage]);
   return (
     <div className="max-w-md mx-auto bg-gray-50 min-h-screen flex flex-col">
       <Header />
@@ -44,6 +74,7 @@ export default function MobileLayout() {
         <Outlet />
       </main>
       <BottomNav />
+       <Toaster richColors /> 
     </div>
   );
 }
