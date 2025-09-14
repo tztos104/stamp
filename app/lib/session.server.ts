@@ -9,7 +9,7 @@ if (!COOKIE_SECRET) {
 // 세션을 저장할 쿠키를 설정합니다.
 export const sessionStorage = createCookieSessionStorage({
   cookie: {
-    name: "__session",
+    name: "__flash_session",
     httpOnly: true,
     path: "/",
     sameSite: "lax",
@@ -18,4 +18,4 @@ export const sessionStorage = createCookieSessionStorage({
   },
 });
 
-export const { getSession, commitSession, destroySession } = sessionStorage;
+export const { getSession: getFlashSession, commitSession, destroySession } = sessionStorage;

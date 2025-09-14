@@ -24,7 +24,7 @@ import { Input } from "~/components/ui/input";
 import { db } from "~/lib/db.server"; // 👈 db.server를 직접 import
 import { lucia, hashPassword } from "~/lib/auth.server"; // 👈 hashPassword를 import (createUser 대신)
 import { Prisma } from "@prisma/client";
-import { getSession, commitSession } from "~/lib/session.server";
+import { getFlashSession, commitSession } from "~/lib/session.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
@@ -56,7 +56,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const session = await lucia.createSession(user.id, {});
     const sessionCookie = lucia.createSessionCookie(session.id);
 
-     const flashSession = await getSession(request.headers.get("Cookie"));
+     const flashSession = await getFlashSession(request.headers.get("Cookie"));
     flashSession.flash("toast", {
       type: "success",
       message: "회원가입이 완료되었습니다! 환영합니다.",
@@ -77,7 +77,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 };
 
-// 1. 폼 데이터의 유효성 검사를 위한 규칙(스키마)을 정의합니다.
+
 const formSchema = z.object({
   name: z.string().min(2, { message: "이름은 2글자 이상이어야 합니다." }),
   phoneNumber:z.string().regex(/^\d{3}-?\d{3,4}-?\d{4}$/, {
@@ -112,14 +112,14 @@ export default function SignupPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* 👇 action에서 에러를 반환하면 여기에 메시지를 표시합니다. */}
+      
           {fetcher.data?.error && (
             <div className="mb-4 rounded-md border border-red-500 bg-red-50 p-3 text-sm text-red-700">
               <p>{fetcher.data.error}</p>
             </div>
           )}
           <Form {...form}>
-            {/* 👇 <form> 태그를 <fetcher.Form>으로 변경할 수도 있지만, handleSubmit을 사용하면 <form>도 괜찮습니다. */}
+           
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
@@ -160,13 +160,16 @@ export default function SignupPage() {
                   </FormItem>
                 )}
               />
-              {/* 👇 fetcher가 데이터를 전송 중일 때 버튼을 비활성화합니다. */}
-              <Button type="submit" className="w-full" disabled={fetcher.state !== 'idle'}>
+             <Button 
+                type="submit" 
+                className="w-full text-white bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 font-semibold" 
+                disabled={fetcher.state !== 'idle'}
+              >
                 {fetcher.state !== 'idle' ? '가입 처리 중...' : '계정 만들기'}
               </Button>
             </form>
           </Form>
-          <div className="mt-4 text-center text-sm">
+          <div className="mt-4 text-center text-xs">
             이미 계정이 있으신가요?{" "}
             <Link to="/login" className="underline">
               로그인
