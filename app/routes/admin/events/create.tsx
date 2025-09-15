@@ -101,13 +101,34 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           });
         }
         
-        // 3-3. 스탬프 발급 (StampEntry 생성)
-        // (실제로는 사용자의 StampCard를 찾아 연결해야 하지만, 우선 단순화)
-        // 이 부분은 나중에 스탬프 카드 로직을 만들 때 정교화해야 합니다.
-        console.log(`'${user.name}'님에게 '${newEvent.name}' 이벤트 스탬프 발급 필요`);
+   // 1. 사용자의 '진행 중인' (사용 완료되지 않은) 스탬프 카드를 찾습니다.
+        let stampCard = await prisma.stampCard.findFirst({
+            where: {
+                userId: user.id,
+                isRedeemed: false,
+            }
+        });
+
+        // 2. 진행 중인 카드가 없으면, 그 사용자를 위해 새로 만듭니다.
+        if (!stampCard) {
+            stampCard = await prisma.stampCard.create({
+                data: {
+                    userId: user.id,
+                }
+            });
+        }
+
+        // 3. StampEntry를 생성하여 사용자와 이벤트, 스탬프 카드를 연결합니다.
+        // 이것이 바로 '스탬프를 찍는' 행위입니다.
+        await prisma.stampEntry.create({
+            data: {
+                userId: user.id,
+                eventId: newEvent.id,
+                stampCardId: stampCard.id,
+            }
+        });
       }
     });
-
     const flashSession = await getFlashSession(request.headers.get("Cookie"));
     flashSession.flash("toast", {
       type: "success",

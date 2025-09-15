@@ -31,6 +31,8 @@ model User {
   keys           Key[]
   eventEntries   StampEntry[]
   claimedStamps  ClaimableStamp[] // 사용자가 등록한 임시 코드 스탬프들
+
+  StampCard StampCard[]
 }
 
 model Session {
@@ -89,8 +91,10 @@ model StampCard {
   isRedeemed Boolean      @default(false)
   entries    StampEntry[]
   coupon     Coupon?
-}
 
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+}
 // --- 리워드 및 임시 코드 관련 모델 ---
 
 model Coupon {
