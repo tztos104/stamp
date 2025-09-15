@@ -6,6 +6,9 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router";
+import { LocalizationProvider } from '@mui/x-date-pickers'; 
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'; 
+import {ko} from 'date-fns/locale/ko'; // 
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -42,7 +45,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  return  <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
+          <Outlet />
+        </LocalizationProvider>;
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

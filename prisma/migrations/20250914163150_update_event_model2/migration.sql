@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE `event` ADD COLUMN `imageUrl` VARCHAR(191) NULL,
+    ADD COLUMN `isAllDay` BOOLEAN NOT NULL DEFAULT true;

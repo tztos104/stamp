@@ -60,6 +60,8 @@ model Event {
   id            String   @id @default(cuid())
   name          String
   description   String?
+  imageUrl      String?
+  isAllDay      Boolean   @default(true)
   startDate     DateTime
   endDate       DateTime
   createdAt     DateTime @default(now())

@@ -17,5 +17,16 @@ export default [
     route("logout", "routes/logout.ts"),
     // 추후 이 레이아웃을 사용하는 다른 페이지가 생기면 여기에 추가하면 됩니다.
     // 예: route("my-page", "routes/my-page.tsx"),
+
+    
   ]),
+  route("admin", "routes/admin/_layout.tsx", [
+    // '/admin'으로 접속했을 때 보여줄 기본 페이지
+    index("routes/admin/index.tsx"),
+     route("events/create", "routes/admin/events/create.tsx"),
+    // 예: 나중에 '/admin/events' 페이지를 만들 경우
+    // route("events", "routes/admin/events.tsx"),
+  ]),
+
+    route("api/categories", "routes/api/categories.ts"),
 ] satisfies RouteConfig;
