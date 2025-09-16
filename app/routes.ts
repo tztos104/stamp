@@ -2,6 +2,7 @@ import {
   type RouteConfig,
   layout,
   index,
+  prefix,
   route
 } from "@react-router/dev/routes";
 
@@ -20,13 +21,19 @@ export default [
 
     
   ]),
-  route("admin", "routes/admin/_layout.tsx", [
-    // '/admin'으로 접속했을 때 보여줄 기본 페이지
+ route("admin", "routes/admin/_layout.tsx", [
     index("routes/admin/index.tsx"),
-     route("events/create", "routes/admin/events/create.tsx"),
-    // 예: 나중에 '/admin/events' 페이지를 만들 경우
-    // route("events", "routes/admin/events.tsx"),
+    
+    // 👇 route(...)를 prefix(...)로 변경합니다.
+    ...prefix("events", [
+        index("routes/admin/events/index.tsx"),
+        route("create", "routes/admin/events/create.tsx"),
+        route(":eventId/edit", "routes/admin/events/$eventId/edit.tsx"),
+    ]),
   ]),
 
     route("api/categories", "routes/api/categories.ts"),
+    route("api/users/search", "routes/api/users/search.ts"),
+    route("api/users/check", "routes/api/users/check.ts"),
+    route("api/events/delete", "routes/api/events/delete.ts"),
 ] satisfies RouteConfig;

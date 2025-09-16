@@ -72,8 +72,16 @@ model Event {
   category      EventCategory @relation(fields: [categoryId], references: [id])
   participants  StampEntry[]
   claimableStamps ClaimableStamp[] // 이 이벤트에 연결된 임시 코드 스탬프들
+
+  images        EventImage[]
 }
 
+model EventImage {
+  id      Int    @id @default(autoincrement())
+  url     String // 이미지 파일의 URL
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
 model StampEntry {
   id          Int      @id @default(autoincrement())
   createdAt   DateTime @default(now())
