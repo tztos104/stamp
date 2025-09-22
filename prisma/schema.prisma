@@ -30,9 +30,13 @@ model User {
   sessions       Session[]
   keys           Key[]
   eventEntries   StampEntry[]
-  claimedStamps  ClaimableStamp[] // 사용자가 등록한 임시 코드 스탬프들
+
 
   StampCard StampCard[]
+
+  reviews Review[]
+
+  ClaimableStampRedemption ClaimableStampRedemption[]
 }
 
 model Session {
@@ -74,6 +78,8 @@ model Event {
   claimableStamps ClaimableStamp[] // 이 이벤트에 연결된 임시 코드 스탬프들
 
   images        EventImage[]
+
+  reviews Review[]
 }
 
 model EventImage {
@@ -91,6 +97,7 @@ model StampEntry {
   event       Event    @relation(fields: [eventId], references: [id])
   stampCardId Int
   stampCard   StampCard @relation(fields: [stampCardId], references: [id])
+  isViewed    Boolean  @default(false)
 }
 
 model StampCard {
@@ -118,13 +125,50 @@ model Coupon {
 
 // 👈 전화번호 모를 때를 위한 '주인 없는 스탬프' 모델
 model ClaimableStamp {
-  id              String    @id @default(cuid())
-  claimCode       String    @unique
-  isClaimed       Boolean   @default(false)
-  expiresAt       DateTime
-  createdAt       DateTime  @default(now())
-  eventId         String
-  event           Event     @relation(fields: [eventId], references: [id])
-  claimedByUserId String?
-  claimedByUser   User?     @relation(fields: [claimedByUserId], references: [id])
+  id               String    @id @default(cuid())
+  claimCode        String    @unique
+  eventId          String
+  event            Event     @relation(fields: [eventId], references: [id])
+  expiresAt        DateTime
+  createdAt        DateTime  @default(now())
+  // 👇 확장성을 위해 이 필드들을 추가합니다.
+  maxUses          Int?      @default(1)// 최대 사용 횟수 (null: 무제한, 1: 1회용)
+  currentUses      Int       @default(0) // 현재 사용 횟수
+
+  // 👇 사용 기록을 위한 관계를 추가합니다.
+  redemptions      ClaimableStampRedemption[]
+}
+
+// 👇 이 모델을 파일 하단에 새로 추가해주세요.
+model ClaimableStampRedemption {
+  id               Int      @id @default(autoincrement())
+  redeemedAt       DateTime @default(now())
+
+  claimableStampId String
+  claimableStamp   ClaimableStamp @relation(fields: [claimableStampId], references: [id])
+
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+
+  // 한 사용자는 같은 코드를 한 번만 사용할 수 있습니다.
+  @@unique([claimableStampId, userId])
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int      // 별점 (1~5)
+  comment   String?  @db.Text // 리뷰 내용 (최대 글자 수를 늘리기 위해 @db.Text 사용)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // --- 관계 설정 ---
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // --- 규칙 설정 ---
+  // 한 명의 유저는 하나의 이벤트에 대해 리뷰를 한 번만 작성할 수 있습니다.
+  @@unique([userId, eventId])
 }

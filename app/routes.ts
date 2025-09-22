@@ -16,8 +16,12 @@ export default [
     route("signup", "routes/signup.tsx"),
     route("login", "routes/login.tsx"),
     route("logout", "routes/logout.ts"),
+    route("card", "routes/card/index.tsx"),
+    route("events", "routes/events/index.tsx"),
+    route("events/:id", "routes/events/$id.tsx"),
+    route("claim", "routes/claim.tsx"),
     // 추후 이 레이아웃을 사용하는 다른 페이지가 생기면 여기에 추가하면 됩니다.
-    // 예: route("my-page", "routes/my-page.tsx"),
+    // 예: route("my-page", "routes/my-page.tsx"),s
 
     
   ]),
@@ -29,6 +33,16 @@ export default [
         index("routes/admin/events/index.tsx"),
         route("create", "routes/admin/events/create.tsx"),
         route(":eventId/edit", "routes/admin/events/$eventId/edit.tsx"),
+        route(":eventId", "routes/admin/events/$eventId/index.tsx"),
+        
+    ]),
+    ...prefix("coupons", [
+        index("routes/admin/coupons/index.tsx"),
+        
+    ]),
+      ...prefix("users", [
+        index("routes/admin/users/index.tsx"),
+        
     ]),
   ]),
 
@@ -36,4 +50,8 @@ export default [
     route("api/users/search", "routes/api/users/search.ts"),
     route("api/users/check", "routes/api/users/check.ts"),
     route("api/events/delete", "routes/api/events/delete.ts"),
+    route("api/events/reviews", "routes/api/events/reviews.ts"),
+    route("api/events/:id", "routes/api/events/$id.ts"),
+    route("api/stamps/view", "routes/api/stamps/view.ts"),
+    route("api/coupons/issue", "routes/api/coupons/issue.ts"),
 ] satisfies RouteConfig;

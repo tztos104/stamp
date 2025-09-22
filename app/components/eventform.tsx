@@ -5,9 +5,8 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
-import { UploadCloud } from "lucide-react";
+import { UploadCloud, X } from "lucide-react";
 import { toast } from "sonner";
-
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "~/components/ui/form";
@@ -16,26 +15,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~
 import { Textarea } from "~/components/ui/textarea";
 import { Switch } from "~/components/ui/switch";
 import { Label } from "~/components/ui/label";
-import { CategoryDialog } from "~/routes/admin/events/categoryDialog"; // 경로 확인 필요
+import { CategoryDialog } from "~/components/categoryDialog"; // 경로 확인 필요
 import { ParticipantManager, type Participant } from "./participantManager"; // 경로 확인 필요
 
 // Zod 스키마
 const eventFormSchema = z.object({
     name: z.string().min(2, '이벤트 이름은 2글자 이상이어야 합니다.'),
     description: z.string().optional(),
-    imageUrl: z.any().optional(), // 파일 업로드는 클라이언트에서 처리 후 URL로 변환
+    newImages: z.any().optional(),// 파일 업로드는 클라이언트에서 처리 후 URL로 변환
     isAllDay: z.boolean(),
     categoryId: z.string().min(1, '카테고리를 선택해주세요.'),
     startDate: z.date().refine(date => date, {
         message: '시작 날짜를 선택해주세요.',
     }),
-    endDate: z.date().refine(date => date, {
-        message: '종료 날짜를 선택해주세요.',
-    }),
-    
+     endDate: z.date(),
+}).refine(data => data.endDate >= data.startDate, {
+    message: "종료일은 시작일보다 빠를 수 없습니다.",
+    path: ["endDate"],
 });
 type EventFormValues = z.infer<typeof eventFormSchema>;
-
+type EventImage = { id: number; url: string; eventId: string };
 // 폼의 props 타입을 정의합니다.
 type EventFormProps = {
     fetcher: any;
@@ -46,7 +45,9 @@ type EventFormProps = {
 export function EventForm({ fetcher, categories, defaultValues }: EventFormProps) {
     const isEditing = !!defaultValues; // defaultValues가 있으면 수정 모드
     
-    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const [existingImages, setExistingImages] = useState<EventImage[]>([]);
+    const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+    const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
     const [participants, setParticipants] = useState<Participant[]>([]);
     const MAX_IMAGES = 10;
 
@@ -68,46 +69,37 @@ export function EventForm({ fetcher, categories, defaultValues }: EventFormProps
     });
 
     // 수정 모드일 때, 이미지와 참가자 목록의 초기 상태를 설정합니다.
-    useEffect(() => {
-        if (isEditing && defaultValues) {
-            if (defaultValues.images && defaultValues.images.length > 0) {
-                setImagePreviews(defaultValues.images.map((img: { url: string }) => img.url));
-            }
-            if (defaultValues.participants && defaultValues.participants.length > 0) {
-                const initialParticipants = defaultValues.participants.map((p: any) => ({
-                    type: 'user',
-                    id: p.user.id,
-                    name: p.user.name,
-                    detail: p.user.phoneNumber,
-                }));
-                setParticipants(initialParticipants);
-            }
+useEffect(() => {
+        if (isEditing && defaultValues?.participants) {
+            setParticipants(defaultValues.participants);
         }
     }, [isEditing, defaultValues]);
 
     const isAllDay = form.watch("isAllDay");
 
-    const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = event.target.files;
-        if (files) {
-            if (files.length + imagePreviews.length > MAX_IMAGES) {
-                toast.error(`사진은 최대 ${MAX_IMAGES}장까지 업로드할 수 있습니다.`);
-                return;
-            }
-            
-            const newPreviews: string[] = [];
-            const dataTransfer = new DataTransfer();
-            
-            Array.from(files).forEach(file => {
-                newPreviews.push(URL.createObjectURL(file));
-                dataTransfer.items.add(file);
-            });
+    const handleNewImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(event.target.files || []);
+        if (!files.length) return;
 
-            setImagePreviews(prev => [...prev, ...newPreviews]);
-            form.setValue("imageUrl", dataTransfer.files);
+        const totalImages = existingImages.length + newImageFiles.length + files.length;
+        if (totalImages > MAX_IMAGES) {
+            toast.error(`사진은 최대 ${MAX_IMAGES}장까지 업로드할 수 있습니다.`);
+            return;
         }
+
+        const previews = files.map(file => URL.createObjectURL(file));
+        setNewImageFiles(prev => [...prev, ...files]);
+        setNewImagePreviews(prev => [...prev, ...previews]);
     };
-    
+     const handleDeleteExistingImage = (idToDelete: number) => {
+        setExistingImages(prev => prev.filter(img => img.id !== idToDelete));
+    };
+
+    const handleDeleteNewImage = (indexToDelete: number) => {
+        setNewImageFiles(prev => prev.filter((_, i) => i !== indexToDelete));
+        setNewImagePreviews(prev => prev.filter((_, i) => i !== indexToDelete));
+    };
+
     function onSubmit(data: EventFormValues) {
         if (participants.length === 0) {
             toast.error("참가자를 한 명 이상 등록해주세요.");
@@ -123,10 +115,19 @@ export function EventForm({ fetcher, categories, defaultValues }: EventFormProps
         formData.append('endDate', data.endDate.toISOString());
         formData.append("participants", JSON.stringify(participants));
 
-        const imageFiles = data.imageUrl as FileList | undefined;
-        if (imageFiles) {
-            Array.from(imageFiles).forEach(file => {
-                formData.append("images", file);
+         if (isEditing) {
+            // "기존 이미지 중 살아남은 것들의 ID 목록"을 전송
+            const existingImageIds = existingImages.map(img => img.id);
+            formData.append('existingImageIds', JSON.stringify(existingImageIds));
+
+            // "새로 추가된 파일 목록"을 'newImages' key로 전송
+            newImageFiles.forEach(file => {
+                formData.append('newImages', file);
+            });
+        } else {
+            // (신규 등록) 'images' key로 모든 파일을 전송
+             newImageFiles.forEach(file => {
+                formData.append('images', file);
             });
         }
 
@@ -135,7 +136,7 @@ export function EventForm({ fetcher, categories, defaultValues }: EventFormProps
             encType: 'multipart/form-data',
         });
     }
-
+ const totalImageCount = existingImages.length + newImageFiles.length;
     return (
         <div className="w-full max-w-2xl mx-auto p-4 sm:p-0">
             <Card>
@@ -163,34 +164,48 @@ export function EventForm({ fetcher, categories, defaultValues }: EventFormProps
                                 )}
                             />
                             
-                            <FormField
-                                control={form.control}
-                                name="imageUrl"
-                                render={() => (
-                                    <FormItem>
-                                        <FormLabel>대표 이미지 (최대 {MAX_IMAGES}장)</FormLabel>
-                                        <FormControl>
-                                            <div className="flex items-center gap-4">
-                                                <div className="flex gap-2 flex-wrap">
-                                                    {imagePreviews.map((src, index) => (
-                                                        <div key={index} className="w-24 h-24 border rounded-lg relative">
-                                                            <img src={src} alt={`미리보기 ${index + 1}`} className="w-full h-full object-cover rounded-lg"/>
-                                                        </div>
-                                                    ))}
-                                                    {imagePreviews.length < MAX_IMAGES && (
-                                                        <Label htmlFor="picture" className="w-24 h-24 border-dashed border-2 rounded-lg flex flex-col items-center justify-center bg-muted/40 cursor-pointer hover:bg-muted">
-                                                            <UploadCloud className="h-8 w-8 text-muted-foreground" />
-                                                            <span className="text-xs text-muted-foreground mt-1">사진 추가</span>
-                                                        </Label>
-                                                    )}
-                                                </div>
-                                                <Input id="picture" type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" />
-                                            </div>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
+                           <FormField
+            control={form.control}
+            name="newImages"
+            render={() => (
+                <FormItem>
+                    <FormLabel>대표 이미지 (최대 {MAX_IMAGES}장)</FormLabel>
+                    <FormControl>
+                        <div className="flex items-center gap-4">
+                            <div className="flex gap-2 flex-wrap">
+                                {/* 기존 이미지 렌더링 */}
+                                {existingImages.map((image) => (
+                                    <div key={image.id} className="w-24 h-24 border rounded-lg relative group">
+                                        <img src={image.url} alt={`기존 이미지 ${image.id}`} className="w-full h-full object-cover rounded-lg"/>
+                                        <button type="button" onClick={() => handleDeleteExistingImage(image.id)} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                                {/* 새로운 이미지 미리보기 렌더링 */}
+                                {newImagePreviews.map((src, index) => (
+                                    <div key={src} className="w-24 h-24 border rounded-lg relative group">
+                                        <img src={src} alt={`미리보기 ${index + 1}`} className="w-full h-full object-cover rounded-lg"/>
+                                         <button type="button" onClick={() => handleDeleteNewImage(index)} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <X size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                                {/* 사진 추가 버튼 */}
+                                {totalImageCount < MAX_IMAGES && (
+                                    <Label htmlFor="picture" className="w-24 h-24 border-dashed border-2 rounded-lg flex flex-col items-center justify-center bg-muted/40 cursor-pointer hover:bg-muted">
+                                        <UploadCloud className="h-8 w-8 text-muted-foreground" />
+                                        <span className="text-xs text-muted-foreground mt-1">사진 추가</span>
+                                    </Label>
                                 )}
-                            />
+                            </div>
+                            <Input id="picture" type="file" accept="image/*" multiple onChange={handleNewImageChange} className="hidden" />
+                        </div>
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+            )}
+        />
 
                             <FormField
                                 control={form.control}

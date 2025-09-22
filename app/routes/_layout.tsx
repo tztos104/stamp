@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { Link, Outlet, useLoaderData } from "react-router";
+import { Link, Outlet, useLoaderData, useLocation } from "react-router";
 import { type LoaderFunctionArgs, json } from "@remix-run/node";
-import { Home, User, ShoppingCart, Settings, LogOut, LogIn } from "lucide-react";
+import { Home, User, ShoppingCart, Settings, LogOut, LogIn,BookHeart, LayoutDashboard, Phone  } from "lucide-react";
 import { Toaster } from "~/components/ui/sonner";
 import { toast } from "sonner";
 import {
@@ -16,7 +16,7 @@ import { Button } from "~/components/ui/button";
 import { getFlashSession, commitSession } from "~/lib/session.server"; // 👈 세션 유틸리티 import
 import { Form } from "react-router";
 import { getSession } from "~/lib/auth.server";
-type LoaderData = {
+export type LoaderData = {
   toastMessage: {
     type: "success" | "error";
     message: string;
@@ -44,9 +44,20 @@ export const loader = async ({ request }: LoaderFunctionArgs): Promise<Response>
 
 function Header() {
   return (
-    <header className="bg-white border-b sticky top-0 z-10">
-      <div className="h-16 flex items-center justify-center">
-        <h1 className="text-lg font-bold">STAMP APP</h1>
+    <header className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+      <div className="h-16 flex items-center justify-between px-4 relative max-w-md mx-auto"> {/* justify-between 추가, relative 추가 */}
+        {/* 왼쪽 로고 */}
+        <Link to="/" className="flex items-center gap-2">
+          <img src="/logo.png" alt="Stampify Logo" className="h-16 w-auto" /> {/* 로고 크기 h-8로 줄임 */}
+        </Link>
+        
+        {/* 중앙 텍스트 */}
+        <div className="absolute left-1/2 -translate-x-1/2"> {/* 중앙 정렬 */}
+          <h1 className="text-lg font-bold text-gray-900">Stamp App</h1>
+        </div>
+
+        {/* 오른쪽 빈 공간 (균형을 위해) */}
+        <div className="w-8"></div> {/* 로고와 같은 너비로 빈 공간 추가 (h-8 이미지에 맞춰 너비도 8로 설정) */}
       </div>
     </header>
   );
@@ -57,53 +68,76 @@ function BottomNav({ user }: { user: {
     phoneNumber: string;
     role: "USER" | "MEMBER" | "ADMIN" | null;
   } | null }) {
-  return (
-    <nav className="bg-white border-t sticky bottom-0">
+
+     const { pathname } = useLocation(); // useLocation 훅 추가
+  
+  const getNavLinkClass = (path: string) => 
+    `flex flex-col items-center gap-1 py-2 px-2 rounded-md transition-colors duration-200 ${
+      pathname === path 
+        ? "text-primary bg-primary/10" // 활성 링크 스타일
+        : "text-gray-600 hover:text-primary-foreground hover:bg-gray-100" // 비활성 링크 스타일
+    }`;
+   return (
+    <nav className="bg-white border-t border-gray-200 sticky bottom-0 z-10 shadow-sm">
       <div className="h-16 flex justify-around items-center max-w-md mx-auto">
-        <Link to="/" className="flex flex-col items-center gap-1 text-gray-500">
-          <Home size={24} />
-          <span className="text-xs font-bold">홈</span>
+        <Link to="/" className={getNavLinkClass("/")}>
+          <Home size={22} />
+          <span className="text-xs font-medium">홈</span>
         </Link>
-        <Link to="#" className="flex flex-col items-center gap-1 text-gray-500">
-          <ShoppingCart size={24} />
-          <span className="text-xs">스탬프</span>
+        <Link to="/card" className={getNavLinkClass("/card")}>
+          <ShoppingCart size={22} />
+          <span className="text-xs font-medium">스탬프</span>
         </Link>
-        
-        {/* 👇 user 정보 유무에 따라 로그인 또는 마이페이지 메뉴를 보여줍니다. */}
+        <Link to="/events" className={getNavLinkClass("/events")}>
+          <BookHeart size={22} />
+          <span className="text-xs font-medium">이벤트</span>
+        </Link>
+
         {user ? (
           <Sheet>
             <SheetTrigger asChild>
-              <button className="flex flex-col items-center gap-1 text-gray-500">
-                <User size={24} />
-                <span className="text-xs">마이페이지</span>
+              <button className={getNavLinkClass("/mypage")}> {/* 마이페이지도 활성 스타일 적용 가능 */}
+                <User size={22} />
+                <span className="text-xs font-medium">마이페이지</span>
               </button>
             </SheetTrigger>
-            <SheetContent>
-              <SheetHeader>
-                <SheetTitle>{user.name}님</SheetTitle>
-                <SheetDescription>
-                  무엇을 도와드릴까요?
-                </SheetDescription>
+            <SheetContent className="w-[300px] sm:w-[400px]"> {/* Sheet 너비 조정 */}
+              <SheetHeader className="mb-6">
+                <SheetTitle className="text-2xl font-bold text-gray-800">{user.name}님</SheetTitle>
+               <SheetDescription asChild>
+                  <div className="text-gray-600 text-base"> {/* 이 div가 SheetDescription의 유일한 자식이 됨 */}
+                    <div className="flex items-center gap-2 mt-2">
+                      <Phone size={16} className="text-gray-500" /> {user.phoneNumber}
+                    </div>
+                   
+                  </div>
+                </SheetDescription>
               </SheetHeader>
               <div className="grid gap-4 py-4">
-                <Button variant="outline" asChild>
-                  <Link to="#">
-                    <Settings className="mr-2 h-4 w-4" /> 내 정보 수정
+                {user.role === "ADMIN" && ( // 관리자일 경우에만 관리자 페이지 링크 표시
+                  <Button variant="outline" asChild className="justify-start">
+                    <Link to="/admin" className="text-primary-foreground"> {/* 관리자 페이지는 좀 더 강조 */}
+                      <LayoutDashboard className="mr-2 h-5 w-5" /> 관리자 페이지
+                    </Link>
+                  </Button>
+                )}
+                <Button variant="outline" asChild className="justify-start">
+                  <Link to="#" className="text-gray-800">
+                    <Settings className="mr-2 h-5 w-5 text-gray-600" /> 내 정보 수정
                   </Link>
                 </Button>
-                {/* 로그아웃 버튼 */}
-                <Form action="/logout" method="post">
-                  <Button type="submit" variant="destructive" className="w-full">
-                    <LogOut className="mr-2 h-4 w-4" /> 로그아웃
+                <Form action="/logout" method="post" className="mt-4">
+                  <Button type="submit" variant="destructive" className="w-full justify-start">
+                    <LogOut className="mr-2 h-5 w-5" /> 로그아웃
                   </Button>
                 </Form>
               </div>
             </SheetContent>
           </Sheet>
         ) : (
-          <Link to="/login" className="flex flex-col items-center gap-1 text-gray-500">
-            <LogIn size={24} />
-            <span className="text-xs">로그인</span>
+          <Link to="/login" className={getNavLinkClass("/login")}>
+            <LogIn size={22} />
+            <span className="text-xs font-medium">로그인</span>
           </Link>
         )}
       </div>

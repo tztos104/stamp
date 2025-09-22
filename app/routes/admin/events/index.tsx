@@ -1,7 +1,7 @@
 // app/routes/admin/events/_index.tsx (최종 기능 완성본)
 
-import { type LoaderFunctionArgs, type SerializeFrom, json } from "@remix-run/node";
-import { Link, useLoaderData, Form, useSearchParams,useFetcher, useRevalidator } from "react-router";
+
+import { Link, useLoaderData, Form, useSearchParams,useFetcher, useNavigate, type LoaderFunctionArgs } from "react-router";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,19 +24,30 @@ import { MoreHorizontal, PlusCircle, Users, Calendar, Search, Package } from "lu
 import { format } from "date-fns";
 import { Badge } from "~/components/ui/badge";
 import { Prisma } from "@prisma/client";
-import { toast } from "sonner"; // 👈 toast import
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Checkbox } from "~/components/ui/checkbox"; // 👈 Checkbox 추가
 import { Label } from "~/components/ui/label"; 
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker'; // 👈 DatePicker로 다시 변경
+import dayjs, { type Dayjs } from 'dayjs';
+import 'dayjs/locale/ko'; 
 const EVENTS_PER_PAGE = 6;
 
 // loader 함수가 검색, 정렬, 필터링, 페이지네이션을 모두 처리하도록 업그레이드
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+
   const url = new URL(request.url);
   const q = url.searchParams.get("q") || "";
   const categoryId = url.searchParams.get("categoryId");
   const page = parseInt(url.searchParams.get("page") || "1");
   const searchType = url.searchParams.get("type") || "event"; // 'event' or 'participant'
+  const searchStartDateParam = url.searchParams.get("searchStartDate");
+  const searchEndDateParam = url.searchParams.get("searchEndDate");
+
+  const searchStartDate = searchStartDateParam ? dayjs(searchStartDateParam).toDate() : undefined;
+  const searchEndDate = searchEndDateParam ? dayjs(searchEndDateParam).toDate() : undefined;
+
   const where: Prisma.EventWhereInput = {
     // 👇 검색 로직을 searchType에 따라 분기 처리합니다.
     AND: [
@@ -46,6 +57,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           : { OR: [{ name: { contains: q } }, { description: { contains: q } }] }
       ) : {},
       categoryId && categoryId !== 'all' ? { categoryId: Number(categoryId) } : {},
+       searchStartDate ? { startDate: { gte: searchStartDate } } : {},
+      searchEndDate ? { endDate: { lte: searchEndDate } } : {},
     ],
   };
 
@@ -72,66 +85,148 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     db.event.count({ where }),
     db.eventCategory.findMany(),
   ]);
-
+ 
   const totalPages = Math.ceil(totalEvents / EVENTS_PER_PAGE);
 
-  return json({ events, totalEvents, categories, page, totalPages, q, categoryId, searchType });
+  return { events, totalEvents, categories, page, totalPages, q, categoryId, searchType,
+    searchStartDate: searchStartDateParam || undefined, // 문자열 원본 그대로 반환 (dayjs 초기화에 사용)
+    searchEndDate: searchEndDateParam || undefined,    
+   };
 };
 
-type LoaderData = SerializeFrom<typeof loader>;
 
 export default function EventListPage() {
-  const { events, totalEvents, categories, page, totalPages, q, categoryId, searchType } = useLoaderData<LoaderData>();
+  const { events, totalEvents, categories, page, totalPages, q, categoryId, searchType ,searchStartDate: initialSearchStartDate, 
+    searchEndDate: initialSearchEndDate } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
-
-
+  const navigate = useNavigate();
+   const [isSearchVisible, setIsSearchVisible] = useState(
+    !!q || !!categoryId || !!initialSearchStartDate || !!initialSearchEndDate // 검색 조건이 있을 경우 기본으로 검색창 열림
+  );
+const [startDate, setStartDate] = useState<Dayjs | null>(
+    initialSearchStartDate ? dayjs(initialSearchStartDate) : null
+  );
+  const [endDate, setEndDate] = useState<Dayjs | null>(
+    initialSearchEndDate ? dayjs(initialSearchEndDate) : null
+  );
   // 페이지네이션 링크를 위한 함수
   const getPageLink = (p: number) => {
     const newParams = new URLSearchParams(searchParams);
     newParams.set("page", String(p));
     return `/admin/events?${newParams.toString()}`;
   };
-
+ 
   return (
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ko">
     <div className="flex flex-col gap-4">
       <Card>
-        <CardHeader>
-          <CardTitle>이벤트 관리</CardTitle>
-          <CardDescription>
-            총 {totalEvents}개의 이벤트가 있습니다.
-          </CardDescription>
+         <CardHeader>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>이벤트 관리</CardTitle>
+              <CardDescription  className="text-xs">
+                총 {totalEvents}개의 이벤트가 있습니다.
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" onClick={() => setIsSearchVisible(prev => !prev)}>
+                <Search className="h-5 w-5" />
+                <span className="sr-only">검색창 열기/닫기</span>
+              </Button>
+              <Button asChild>
+                <Link to="/admin/events/create"><PlusCircle className="h-4 w-4 mr-2" /> 새 이벤트</Link>
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {/* --- 검색 및 필터 UI --- */}
-          <Form method="get" className="flex flex-col sm:flex-row gap-2 mb-4">
-               <Select name="type" defaultValue={searchType}>
-              <SelectTrigger className="w-full sm:w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="event">이벤트</SelectItem>
-                <SelectItem value="participant">참가자</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input name="q" placeholder="이벤트 이름 검색..." defaultValue={q || ""} />
-            <Select name="categoryId" defaultValue={categoryId || "all"}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="모든 카테고리" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">모든 카테고리</SelectItem>
-                {categories.map(cat => (
+          {isSearchVisible && (
+            <Form method="get" className="flex flex-col sm:flex-row gap-2 mb-4 p-4 border rounded-lg bg-muted/50">
+               <input type="hidden" name="searchStartDate" value={startDate ? startDate.format('YYYY-MM-DD') : ''} />
+                <input type="hidden" name="searchEndDate" value={endDate ? endDate.format('YYYY-MM-DD') : ''} />
+              <Select name="type" defaultValue={searchType}>
+                <SelectTrigger className="w-full sm:w-[120px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="event">이벤트</SelectItem>
+                  <SelectItem value="participant">참가자</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input name="q" placeholder="검색어 입력..." defaultValue={q || ""} className="flex-grow"/>
+              <Select name="categoryId" defaultValue={categoryId || "all"}>
+                <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="모든 카테고리" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">모든 카테고리</SelectItem>
+                  {categories.map(cat => (
                     <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button type="submit" className="w-full sm:w-auto">
-              <Search className="h-4 w-4 mr-2"/> 검색
-            </Button>
-            <Button asChild variant="secondary" className="w-full sm:w-auto">
-                <Link to="/admin/events/create"><PlusCircle className="h-4 w-4 mr-2" /> 새 이벤트</Link>
-            </Button>
-          </Form>
+                  ))}
+                </SelectContent>
+              </Select>
+               <div className="flex flex-col sm:flex-row items-center gap-2">
+                  <DatePicker
+                    label="시작일"
+                    value={startDate}
+                    onChange={(newValue) => setStartDate(newValue as Dayjs)}
+                    format="YYYY년 MM월 DD일"
+                    slotProps={{ 
+                      textField: { 
+                        size: 'small', 
+                        fullWidth: true, 
+                        sx: {
+                          '& .MuiInputBase-root': {
+                            borderRadius: '0.375rem', // rounded-md
+                            borderColor: '#e2e8f0', // border-gray-200
+                            height: '40px', // Input 높이 조정
+                            '&.Mui-focused': {
+                              borderColor: '#2563eb', // border-blue-600 focus
+                              boxShadow: '0 0 0 1px #2563eb',
+                            },
+                          },
+                          '& .MuiInputBase-input': {
+                            padding: '8px 14px', // 내부 패딩 조정
+                          },
+                          '& .MuiInputAdornment-root': {
+                            marginRight: '0px',
+                          }
+                        }
+                      } 
+                    }}
+                  />
+                  <span className="hidden sm:inline">-</span>
+                  <DatePicker
+                    label="종료일"
+                    value={endDate}
+                    onChange={(newValue) => setEndDate(newValue as Dayjs)}
+                    format="YYYY년 MM월 DD일"
+                    slotProps={{ 
+                      textField: { 
+                        size: 'small', 
+                        fullWidth: true, 
+                        sx: {
+                          '& .MuiInputBase-root': {
+                            borderRadius: '0.375rem', // rounded-md
+                            borderColor: '#e2e8f0', // border-gray-200
+                            height: '40px', // Input 높이 조정
+                            '&.Mui-focused': {
+                              borderColor: '#2563eb', // border-blue-600 focus
+                              boxShadow: '0 0 0 1px #2563eb',
+                            },
+                          },
+                          '& .MuiInputBase-input': {
+                            padding: '8px 14px', // 내부 패딩 조정
+                          },
+                          '& .MuiInputAdornment-root': {
+                            marginRight: '0px',
+                          }
+                        }
+                      } 
+                    }}
+                  />
+                </div>
+                
+              <Button type="submit" className="w-full sm:w-auto"><Search className="h-4 w-4 mr-2"/> 검색</Button>
+            </Form>
+          )}
 
           {/* --- 이벤트 목록 --- */}
           {events.length === 0 ? (
@@ -145,60 +240,66 @@ export default function EventListPage() {
                {events.map((event) => {
                 const totalParticipants = event._count.participants + event._count.claimableStamps;
                 return (
-                  <Card key={event.id} className="w-full">
-                    <div className="flex items-start p-4 gap-4">
-                      {/* 1. 작은 대표 이미지 (왼쪽) */}
-                      <div className="w-24 h-24 rounded-md bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
-                        {event.images[0]?.url ? (
+                 
+                    <Card  key={event.id} className="transition-all group-hover:bg-muted/50 group-hover:shadow-md  relative group">
+                       
+
+                       <div className="flex items-start p-4 gap-4">
+                        
+                        <div className="w-24 h-24 rounded-md bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                          {event.images[0]?.url ? (
                             <img src={event.images[0].url} alt={event.name} className="w-full h-full object-cover"/>
-                        ) : (
+                          ) : (
                             <Package className="h-10 w-10 text-muted-foreground"/>
-                        )}
-                      </div>
-                      
-                      {/* 2. 이벤트 정보 (중간) */}
-                      <div className="flex-1 grid gap-2">
+                          )}
+                        </div>
+                        
+                        <div className="flex-1 grid gap-2">
                           <div className="flex items-center gap-2 flex-wrap">
                             <Badge variant="outline">{event.category.name}</Badge>
-                            <p className="font-semibold text-sm leading-tight">{event.name}</p>
+                            <p className="font-semibold text-sm leading-tight group-hover:underline">{event.name}</p>
                           </div>
                           <div className="flex items-center text-sm text-muted-foreground">
-                              <Calendar className="h-4 w-4 mr-2"/>
-                              <span>{format(new Date(event.startDate), "yyyy.MM.dd")}</span>
+                            <Calendar className="h-4 w-4 mr-2"/>
+                            <span>{format(new Date(event.startDate), "yyyy.MM.dd")}</span>
                           </div>
-                          {/* 👇 참가자 수와 이름 목록 표시 */}
                           <div className="flex items-start text-sm text-muted-foreground">
-                              <Users className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0"/>
-                              <div>
-                               
-                                  <div className="flex flex-wrap gap-1 ">
-                                      {event.participants.map(({ user }) => (
-                                          <Badge key={user.id} variant="secondary" className="text-xs">{user.name}</Badge>
-                                      ))}
-                                      {totalParticipants > 5 && <span className="text-xs self-center"> 등</span>}
-                                  </div>
+                            <Users className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0"/>
+                            <div>
+                              <div className="flex flex-wrap gap-1">
+                                {event.participants.map(({ user }) => (
+                                  <Badge key={user.id} variant="secondary" className="text-xs">{user.name}</Badge>
+                                ))}
+                                {totalParticipants > 5 && <span className="text-xs self-center"> 등</span>}
                               </div>
+                            </div>
                           </div>
-                      </div>
-
+                        </div>
                     {/* 3. 수정/삭제 메뉴 (오른쪽) */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button aria-haspopup="true" size="icon" variant="ghost">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>작업</DropdownMenuLabel>
-                        <DropdownMenuItem>상세보기</DropdownMenuItem>
-                        <DropdownMenuItem>수정</DropdownMenuItem>
-                        
-                        <DropdownMenuSeparator />
-                     <DeleteEventDialog event={event} />
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
+                    <div className="absolute top-2 right-2 z-10">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button aria-haspopup="true" size="icon" variant="ghost">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>작업</DropdownMenuLabel>
+                            <DropdownMenuItem onSelect={() => navigate(`/admin/events/${event.id}/edit`)}>
+                              수정
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DeleteEventDialog event={event} />
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                    <Link to={`/admin/events/${event.id}`} className="absolute inset-0 z-0">
+                      <span className="sr-only">{event.name} 상세 보기</span>
+                    </Link>
+
                 </Card>
+                
               );
             })}
             </div>
@@ -243,11 +344,12 @@ export default function EventListPage() {
         </CardContent>
       </Card>
     </div>
+    </LocalizationProvider>
   );
 }
 
 // 👇 삭제 다이얼로그를 별도의 컴포넌트로 분리하여 관리
-function DeleteEventDialog({ event }: { event: SerializeFrom<typeof loader>['events'][0] }) {
+function DeleteEventDialog({ event }: {event: any}) {
     const [isForceChecked, setIsForceChecked] = useState(false);
     const fetcher = useFetcher<{ error?: string }>();
     const errorMessage = fetcher.data?.error;
