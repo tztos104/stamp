@@ -1,4 +1,20 @@
-.react-router
-build
+# Git 관련 파일
+.git
+.gitignore
+
+# Docker 관련 파일
+Dockerfile
+.dockerignore
+
+# 의존성 폴더 (Dockerfile 내부에서 관리)
 node_modules
+
+# 빌드 결과물 (Dockerfile 내부에서 생성)
+build
+.react-router
+
+# 환경 변수 파일 (서버에서 별도로 주입)
+.env*
+
+# 문서 및 기타
 README.md

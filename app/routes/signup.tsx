@@ -59,46 +59,80 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const hashedPassword = hashPassword(password);
 
   try {
-    // --- 데이터베이스 트랜잭션 시작 (사용자 생성 + 스탬프 적립) ---
-    const transactionResult = await db.$transaction(async (prisma) => {
-      // 1. 사용자 생성 로직
-      const user = await prisma.user.create({
-        data: {
-          name,
-          phoneNumber,
-          status: "ACTIVE",
-          keys: {
-            create: {
-              id: `password:${phoneNumber}`,
-              hashedPassword,
-            },
-          },
-        },
-        select: { id: true },
+   const transactionResult = await db.$transaction(async (prisma) => {
+      // 1. 기존 사용자를 전화번호로 찾습니다. (상태 무관)
+      const existingUser = await prisma.user.findUnique({
+        where: { phoneNumber },
       });
 
-      // 2. (claimCode가 있을 경우에만) 스탬프 적립 및 사용 기록
+      let user: { id: string };
+
+      // 2. 사용자 상태에 따라 분기 처리
+      if (existingUser) {
+        // 2-1. 이미 존재하는 정식 회원(ACTIVE)일 경우, 오류 처리
+        if (existingUser.status === 'ACTIVE') {
+          throw new Prisma.PrismaClientKnownRequestError(
+            "이미 사용 중인 전화번호입니다.",
+            { code: 'P2002', clientVersion: '' }
+          );
+        }
+
+        // 2-2. 임시 회원(TEMPORARY)일 경우, 정식 회원으로 전환 (UPDATE)
+        user = await prisma.user.update({
+          where: { id: existingUser.id },
+          data: {
+            name, // 사용자가 입력한 이름으로 업데이트
+            status: 'ACTIVE',
+          },
+          select: { id: true },
+        });
+
+        // Key 테이블에 비밀번호 정보 생성
+        await prisma.key.create({
+          data: {
+            id: `password:${phoneNumber}`,
+            userId: user.id,
+            hashedPassword,
+          },
+        });
+
+      } else {
+        // 2-3. 존재하지 않는 사용자일 경우, 신규 생성 (CREATE)
+        user = await prisma.user.create({
+          data: {
+            name,
+            phoneNumber,
+            status: "ACTIVE",
+            keys: {
+              create: {
+                id: `password:${phoneNumber}`,
+                hashedPassword,
+              },
+            },
+          },
+          select: { id: true },
+        });
+      }
+
+
+      // 3. (claimCode가 있을 경우에만) 스탬프 적립 및 사용 기록
       if (claimCode) {
         const claimableStamp = await prisma.claimableStamp.findUnique({
           where: { claimCode },
           include: { event: true },
         });
 
-        // 유효성 검사 (다시 한 번)
         if (!claimableStamp) throw new Error("존재하지 않는 스탬프 코드입니다.");
         if (new Date() > claimableStamp.expiresAt) throw new Error("만료된 스탬프 코드입니다.");
         if (claimableStamp.maxUses !== null && claimableStamp.currentUses >= claimableStamp.maxUses) {
           throw new Error("이 스탬프 코드는 모두 사용되었습니다.");
         }
         
-        // 이 사용자가 이 코드를 이미 사용했는지 확인 (트랜잭션 내부에서 안전하게)
         const existingRedemption = await prisma.claimableStampRedemption.findUnique({
             where: { claimableStampId_userId: { claimableStampId: claimableStamp.id, userId: user.id } }
         });
         if (existingRedemption) throw new Error("이미 사용한 스탬프 코드입니다.");
 
-
-        // 스탬프 카드 찾기 또는 생성
         let activeStampCard = await prisma.stampCard.findFirst({
           where: { userId: user.id, isRedeemed: false },
         });
@@ -106,7 +140,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           activeStampCard = await prisma.stampCard.create({ data: { userId: user.id } });
         }
 
-        // 스탬프 적립
         await prisma.stampEntry.create({
           data: {
             userId: user.id,
@@ -115,7 +148,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           },
         });
 
-        // ClaimableStamp 사용 횟수 증가 및 기록 추가
         await prisma.claimableStamp.update({
           where: { id: claimableStamp.id },
           data: {
@@ -126,8 +158,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           },
         });
       }
-      return user; // 생성된 사용자 객체를 반환
+      return user;
     });
+
     // --- 트랜잭션 종료 ---
 
     // 3. 회원가입 성공 시 세션 생성 및 리다이렉트

@@ -74,7 +74,7 @@ function BottomNav({ user }: { user: {
   const getNavLinkClass = (path: string) => 
     `flex flex-col items-center gap-1 py-2 px-2 rounded-md transition-colors duration-200 ${
       pathname === path 
-        ? "text-primary bg-primary/10" // 활성 링크 스타일
+        ? "text-primary bg-green-100" // 활성 링크 스타일
         : "text-gray-600 hover:text-primary-foreground hover:bg-gray-100" // 비활성 링크 스타일
     }`;
    return (
@@ -116,13 +116,13 @@ function BottomNav({ user }: { user: {
               <div className="grid gap-4 py-4">
                 {user.role === "ADMIN" && ( // 관리자일 경우에만 관리자 페이지 링크 표시
                   <Button variant="outline" asChild className="justify-start">
-                    <Link to="/admin" className="text-primary-foreground"> {/* 관리자 페이지는 좀 더 강조 */}
+                    <Link to="/admin" className="text-gray-800"> {/* 관리자 페이지는 좀 더 강조 */}
                       <LayoutDashboard className="mr-2 h-5 w-5" /> 관리자 페이지
                     </Link>
                   </Button>
                 )}
                 <Button variant="outline" asChild className="justify-start">
-                  <Link to="#" className="text-gray-800">
+                  <Link to="/mypage" className="text-gray-800">
                     <Settings className="mr-2 h-5 w-5 text-gray-600" /> 내 정보 수정
                   </Link>
                 </Button>

@@ -1,8 +1,12 @@
 .DS_Store
 /node_modules/
 .env
+.env.*
+!.env.example
+!.env.d.ts
+!.*.enc
 # React Router
 /.react-router/
 /build/
-
+secure.key
 /generated/prisma

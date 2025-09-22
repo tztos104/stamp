@@ -1,38 +1,35 @@
-// app/routes/admin/coupons._index.tsx
+// app/routes/admin/coupons/index.tsx (카드 레이아웃으로 변경)
 
 import { type LoaderFunctionArgs, redirect } from "react-router";
-import { useLoaderData, Form, Link, useSearchParams, useFetcher } from "react-router";
+import { useLoaderData, Form, useSearchParams, useFetcher } from "react-router";
 import { db } from "~/lib/db.server";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext } from "~/components/ui/pagination";
-import { Badge } from "~/components/ui/badge";
-import { Search, Ticket } from "lucide-react";
+import { Search, Ticket, User, Calendar } from "lucide-react";
 import { Prisma } from "@prisma/client";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Switch } from "~/components/ui/switch";
+import { Label } from "~/components/ui/label";
 
 const COUPONS_PER_PAGE = 10;
 
-// ----------------------------------------------------
-// 1. Loader 함수: 모든 쿠폰 목록을 검색/필터링/페이지네이션 기능과 함께 불러옵니다.
-// ----------------------------------------------------
+// --- Loader 함수 (변경 없음) ---
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const q = url.searchParams.get("q") || "";
-  const status = url.searchParams.get("status"); // 'used', 'not_used', or 'all'
+  const status = url.searchParams.get("status");
   const page = parseInt(url.searchParams.get("page") || "1");
 
   const where: Prisma.CouponWhereInput = {
     AND: [
       q ? {
         OR: [
-          { code: { contains: q } }, // 쿠폰 코드로 검색
-          { stampCard: { user: { name: { contains: q } } } }, // 사용자 이름으로 검색
+          { code: { contains: q } },
+          { stampCard: { user: { name: { contains: q } } } },
         ],
       } : {},
       status === 'used' ? { isUsed: true } : {},
@@ -49,7 +46,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       include: {
         stampCard: {
           include: {
-            user: { select: { name: true } }, // 쿠폰 소유자 이름
+            user: { select: { id: true, name: true } },
           },
         },
       },
@@ -62,9 +59,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { coupons, totalCoupons, page, totalPages, q, status };
 };
 
-// ----------------------------------------------------
-// 2. Default 컴포넌트: 쿠폰 목록 UI 렌더링
-// ----------------------------------------------------
+// --- Default 컴포넌트: 쿠폰 목록 UI 렌더링 (카드 형식으로 변경) ---
 export default function AdminCouponsPage() {
   const { coupons, totalCoupons, page, totalPages, q, status } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
@@ -83,7 +78,7 @@ export default function AdminCouponsPage() {
           <CardDescription>총 {totalCoupons}개의 쿠폰이 발급되었습니다.</CardDescription>
         </CardHeader>
         <CardContent>
-          {/* --- 검색 및 필터 UI --- */}
+          {/* --- 검색 및 필터 UI (변경 없음) --- */}
           <Form method="get" className="flex flex-col sm:flex-row gap-2 mb-4">
             <Input name="q" placeholder="쿠폰 코드, 사용자 이름 검색..." defaultValue={q || ""} className="flex-grow" />
             <Select name="status" defaultValue={status || "all"}>
@@ -99,35 +94,21 @@ export default function AdminCouponsPage() {
             <Button type="submit"><Search className="h-4 w-4 mr-2" /> 검색</Button>
           </Form>
 
-          {/* --- 쿠폰 목록 테이블 --- */}
-          <div className="border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                 
-                  <TableHead className="w-15">사용자</TableHead>
-                  <TableHead>설명</TableHead>
-                  <TableHead>유효 기간</TableHead>
-                  <TableHead className="text-center">사용 여부</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {coupons.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
-                      해당하는 쿠폰이 없습니다.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  coupons.map((coupon) => (
-                    <CouponRow key={coupon.id} coupon={coupon} />
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          {/* --- 쿠폰 목록 카드 그리드 --- */}
+          {coupons.length === 0 ? (
+            <div className="text-center py-20 border-dashed border-2 rounded-lg">
+                <h3 className="text-lg font-semibold">해당하는 쿠폰이 없습니다.</h3>
+                <p className="text-sm text-muted-foreground mt-2">다른 검색어나 필터를 사용해보세요.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {coupons.map((coupon) => (
+                <CouponCard key={coupon.id} coupon={coupon} />
+              ))}
+            </div>
+          )}
 
-          {/* --- 페이지네이션 --- */}
+          {/* --- 페이지네이션 (변경 없음) --- */}
           {totalPages > 1 && (
             <Pagination className="mt-8">
               <PaginationContent>
@@ -149,41 +130,53 @@ export default function AdminCouponsPage() {
   );
 }
 
-// ----------------------------------------------------
-// 3. 쿠폰 행 컴포넌트 (상태 변경 로직 포함)
-// ----------------------------------------------------
-function CouponRow({ coupon }: { coupon: any }) {
+// --- 쿠폰 카드 컴포넌트 (신규) ---
+function CouponCard({ coupon }: { coupon: any }) {
   const fetcher = useFetcher();
   const isSubmitting = fetcher.state !== 'idle';
   
-  // Optimistic UI: 서버 응답을 기다리지 않고 즉시 UI 변경
-  const optimisticIsUsed = isSubmitting 
-    ? !coupon.isUsed 
-    : coupon.isUsed;
+  const optimisticIsUsed = isSubmitting ? !coupon.isUsed : coupon.isUsed;
 
   return (
-    <TableRow>
-    
-      <TableCell>{coupon.stampCard.user.name}</TableCell>
-      <TableCell>{coupon.description}</TableCell>
-      <TableCell>{format(new Date(coupon.expiresAt), "yyyy.MM.dd 까지", { locale: ko })}</TableCell>
-      <TableCell className="text-center">
-        <fetcher.Form method="post" action="/api/coupons/issue">
-        <input type="hidden" name="intent" value="toggleCouponStatus" />
-          <input type="hidden" name="couponId" value={coupon.id} />
-          <Switch
-            checked={optimisticIsUsed}
-             onCheckedChange={() => {
-              fetcher.submit(
-                { couponId: coupon.id, intent: "toggleCouponStatus" }, // intent 필드 포함
-                { method: 'post', action: '/api/coupons/issue' }
-              );
-            }}
-            disabled={isSubmitting}
-            aria-label="쿠폰 사용 여부 토글"
-          />
+    <Card className={`flex flex-col transition-all ${optimisticIsUsed ? 'bg-muted/50' : 'bg-background'}`}>
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+            <Ticket className="h-5 w-5 text-primary" />
+            {coupon.description}
+        </CardTitle>
+        <CardDescription className="font-mono text-sm pt-1">{coupon.code}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex-grow space-y-2 text-sm">
+        <div className="flex items-center">
+            <User className="h-4 w-4 mr-2 text-muted-foreground" />
+            <span>{coupon.stampCard.user.name}</span>
+        </div>
+        <div className="flex items-center">
+            <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+            <span>~{format(new Date(coupon.expiresAt), "yyyy.MM.dd", { locale: ko })} 까지</span>
+        </div>
+      </CardContent>
+      <CardFooter className="border-t pt-4">
+        <fetcher.Form method="post" action="/api/coupons/issue" className="w-full">
+            <input type="hidden" name="intent" value="toggleCouponStatus" />
+            <input type="hidden" name="couponId" value={coupon.id} />
+            <div className="flex items-center justify-between w-full">
+                <Label htmlFor={`coupon-switch-${coupon.id}`} className={optimisticIsUsed ? "text-muted-foreground" : ""}>사용 여부</Label>
+                <Switch
+                    id={`coupon-switch-${coupon.id}`}
+                    checked={optimisticIsUsed}
+                    onCheckedChange={() => {
+                        fetcher.submit(
+                            { couponId: coupon.id, intent: "toggleCouponStatus" },
+                            { method: 'post', action: '/api/coupons/issue' }
+                        );
+                    }}
+                    disabled={isSubmitting}
+                    aria-label="쿠폰 사용 여부 토글"
+                />
+            </div>
         </fetcher.Form>
-      </TableCell>
-    </TableRow>
+      </CardFooter>
+    </Card>
   );
 }

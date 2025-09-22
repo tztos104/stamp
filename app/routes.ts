@@ -20,6 +20,7 @@ export default [
     route("events", "routes/events/index.tsx"),
     route("events/:id", "routes/events/$id.tsx"),
     route("claim", "routes/claim.tsx"),
+    route("mypage", "routes/mypage.tsx"),
     // 추후 이 레이아웃을 사용하는 다른 페이지가 생기면 여기에 추가하면 됩니다.
     // 예: route("my-page", "routes/my-page.tsx"),s
 
@@ -42,6 +43,7 @@ export default [
     ]),
       ...prefix("users", [
         index("routes/admin/users/index.tsx"),
+        route(":userId", "routes/admin/users/$userId.tsx"),
         
     ]),
   ]),
