@@ -15,6 +15,7 @@ build
 
 # 환경 변수 파일 (서버에서 별도로 주입)
 .env*
+!/.env*.enc
 
 # 문서 및 기타
 README.md
