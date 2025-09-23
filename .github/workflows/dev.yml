@@ -49,26 +49,7 @@ jobs:
             -e SECURE_KEY_CONTENT='${{ secrets.SECURE_KEY_CONTENT }}' \
             ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:dev
             
-          echo "--- Starting Debug Logs ---"
-          sleep 5 
-
-         
-          echo "--- Container logs (after entrypoint) ---"
-          docker logs stamp-app-dev
-
-         
-          echo "--- Listing files in /app directory ---"
-          docker exec stamp-app-dev ls -la
-
-          
-          echo "--- Contents of .env file ---"
-          docker exec stamp-app-dev cat .env || echo ".env file not found."
-         
-
-          echo "Waiting for the container to stabilize..."
-          sleep 5 
-
-          echo "Running the database seed script..."
+       
           sleep 10      
           docker exec stamp-app-dev npx prisma migrate deploy    
           docker exec stamp-app-dev npx prisma db seed
