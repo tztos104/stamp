@@ -25,6 +25,15 @@ else
   echo "Warning: No .env or .env.staging file found after decryption."
 fi
 
+
+# 👇 1. 데이터베이스 마이그레이션 실행
+echo "Running database migration..."
+npx prisma migrate deploy
+
+# 👇 2. 데이터베이스 시딩 실행 (선택 사항이지만, 첫 배포 시 유용)
+echo "Running database seed..."
+npx prisma db seed
+
 # 복호화가 끝나면 메인 애플리케이션 실행
 echo "Starting the application..."
 exec "$@"
