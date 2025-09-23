@@ -51,6 +51,25 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:dev
             
        
+          echo "--- Starting Secure Debug Logs ---"
+          sleep 5
+
+          
+          echo "--- Container logs (after entrypoint) ---"
+          docker logs stamp-app-dev
+
+          
+          echo "--- Listing files in /app directory ---"
+          docker exec stamp-app-dev ls -la
+
+          
+          echo "--- Checking for .env file existence ---"
+          docker exec stamp-app-dev sh -c 'if [ -f .env ]; then echo ".env file exists."; else echo ".env file does NOT exist."; fi'
+         
+
+          sleep 5
+          
+          echo "Running database migration and seed..."
           sleep 10      
           docker exec stamp-app-dev npx prisma migrate deploy    
           docker exec stamp-app-dev npx prisma db seed
