@@ -1,7 +1,6 @@
-# Dockerfile (수정)
 
-# --- 1. 빌드(builder) 단계 (변경 없음) ---
-FROM node:20-alpine AS builder
+# --- 1. 빌드(builder) 단계 ---
+FROM node:22-alpine AS builder 
 WORKDIR /app
 RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml ./
@@ -12,7 +11,7 @@ RUN pnpm build
 RUN pnpm prune --prod
 
 # --- 2. 실행(runner) 단계 (수정) ---
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 RUN npm install -g pnpm
 
@@ -21,14 +20,14 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
-
-# 👇 scripts 폴더 전체를 복사하도록 변경
 COPY scripts/ ./scripts/
+# 👇 PM2 설정 파일을 이미지 안으로 복사
+COPY ecosystem.config.cjs .
 
 ENV NODE_ENV=production
 
-# 👇 entrypoint.sh의 경로를 수정한 경로로 지정
 ENTRYPOINT ["/app/scripts/entrypoint.sh"]
 
-# entrypoint.sh가 최종적으로 실행할 명령어
-CMD ["pnpm", "start"]
+# 👇 CMD 명령어를 pm2-runtime을 사용하도록 변경
+# "pnpm exec"를 통해 node_modules에 설치된 pm2-runtime을 실행합니다.
+CMD ["pnpm", "exec", "pm2-runtime", "start", "ecosystem.config.cjs"]

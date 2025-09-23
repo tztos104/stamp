@@ -33,22 +33,18 @@ jobs:
       with:
         # 👇 운영 서버용 Secret을 사용하도록 변경합니다.
         host: ${{ secrets.MAIN_HOST }}
-        username: ${{ secrets.MAIN_USERNAME }}
-        key: ${{ secrets.MAIN_SSH_KEY }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
         script: |
           docker pull ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:latest
           
-         
           docker stop stamp-app-main || true
           docker rm stamp-app-main || true
           
           docker run -d --name stamp-app-main \
             -p 3000:3000 \
+            # 👇 오직 복호화 키 하나만 전달합니다.
             -e SECURE_KEY_CONTENT='${{ secrets.SECURE_KEY_CONTENT }}' \
-            -e AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}' \
-            -e AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}' \
-            -e AWS_REGION='${{ secrets.AWS_REGION }}' \
-            -e S3_BUCKET_NAME='${{ secrets.MAIN_S3_BUCKET_NAME }}' \
             ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:latest
 
             
