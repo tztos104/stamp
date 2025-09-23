@@ -48,4 +48,4 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:latest
 
             sleep 10          
-            docker exec stamp-app-dev npx prisma db seed
+            docker exec stamp-app-main npx prisma db seed
