@@ -1,19 +1,17 @@
-// ecosystem.config.cjs
-
 module.exports = {
   apps: [
     {
       name: 'stamp-app',
       script: './build/server/index.js',
-      instances: 'max',
-      exec_mode: 'cluster',
+      // 👇 instances를 1로, exec_mode를 'fork'로 변경합니다.
+      instances: 1,
+      exec_mode: 'fork',
       autorestart: true,
       watch: false,
       max_memory_restart: '1G',
-      // 👇 이 두 줄을 추가하여 Node.js가 직접 .env 파일을 읽도록 합니다.
-      interpreter: 'node',
-      interpreter_args: '--env-file=.env',
-   
+      // 👇 dotenv를 사용하기로 했으므로, 이 부분은 삭제합니다.
+      // interpreter: 'node',
+      // interpreter_args: '--env-file=.env',
     },
   ],
 };
