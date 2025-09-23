@@ -43,8 +43,9 @@ jobs:
           
           docker run -d --name stamp-app-main \
             -p 3000:3000 \
-            # 👇 오직 복호화 키 하나만 전달합니다.
+           
             -e SECURE_KEY_CONTENT='${{ secrets.SECURE_KEY_CONTENT }}' \
             ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:latest
 
-            
+            sleep 10          
+            docker exec stamp-app-dev npx prisma db seed

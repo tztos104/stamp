@@ -48,3 +48,6 @@ jobs:
             -p 3001:3000 \
             -e SECURE_KEY_CONTENT='${{ secrets.SECURE_KEY_CONTENT }}' \
             ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:dev
+            
+            sleep 10          
+            docker exec stamp-app-dev npx prisma db seed
