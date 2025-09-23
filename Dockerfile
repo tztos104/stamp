@@ -24,7 +24,6 @@ COPY scripts/ ./scripts/
 # 👇 PM2 설정 파일을 이미지 안으로 복사
 COPY ecosystem.config.cjs .
 COPY .env.*.enc .
-COPY server.js .
 
 ENV NODE_ENV=production
 
