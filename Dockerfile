@@ -30,7 +30,3 @@ ENV NODE_ENV=production
 
 ENTRYPOINT ["/app/scripts/entrypoint.sh"]
 
-# 👇 CMD 명령어를 PM2 대신 node를 직접 실행하도록 변경합니다.
-# Node.js의 --env-file 옵션으로 .env 파일을 직접 로드하고,
-# package.json의 start 명령어가 실행하는 build/server/index.js를 직접 실행합니다.
-CMD ["node", "--env-file=.env", "./build/server/index.js"]

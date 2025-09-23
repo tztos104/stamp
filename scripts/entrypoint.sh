@@ -36,4 +36,4 @@ npx prisma db seed
 
 # 복호화가 끝나면 메인 애플리케이션 실행
 echo "Starting the application..."
-exec "$@"
+exec node --env-file=.env ./build/server/index.js
