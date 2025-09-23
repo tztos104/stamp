@@ -1,6 +1,7 @@
+# Dockerfile (최종 디버깅용)
 
-# --- 1. 빌드(builder) 단계 ---
-FROM node:22-alpine AS builder 
+# --- 1. 빌드(builder) 단계 (변경 없음) ---
+FROM node:22-alpine AS builder
 WORKDIR /app
 RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml ./
@@ -21,14 +22,15 @@ COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
 COPY scripts/ ./scripts/
-# 👇 PM2 설정 파일을 이미지 안으로 복사
-COPY ecosystem.config.cjs .
+# 👇 ecosystem.config.cjs는 더 이상 사용하지 않으므로 복사 라인을 주석 처리하거나 삭제합니다.
+# COPY ecosystem.config.cjs .
 COPY .env.*.enc .
 
 ENV NODE_ENV=production
 
 ENTRYPOINT ["/app/scripts/entrypoint.sh"]
 
-# 👇 CMD 명령어를 pm2-runtime을 사용하도록 변경
-# "pnpm exec"를 통해 node_modules에 설치된 pm2-runtime을 실행합니다.
-CMD ["pnpm", "exec", "pm2-runtime", "start", "ecosystem.config.cjs"]
+# 👇 CMD 명령어를 PM2 대신 node를 직접 실행하도록 변경합니다.
+# Node.js의 --env-file 옵션으로 .env 파일을 직접 로드하고,
+# package.json의 start 명령어가 실행하는 build/server/index.js를 직접 실행합니다.
+CMD ["node", "--env-file=.env", "./build/server/index.js"]
