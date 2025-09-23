@@ -10,6 +10,10 @@ module.exports = {
       autorestart: true, // 앱이 꺼지면 자동으로 재시작
       watch: false, // 파일 변경 감지는 사용 안 함 (Docker에서는 불필요)
       max_memory_restart: '1G', // 메모리 사용량이 1GB를 초과하면 재시작
+      env: {
+        "HOST": "0.0.0.0",
+        "PORT": 3000
+      }
     },
   ],
 };
