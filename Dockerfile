@@ -25,8 +25,8 @@ COPY scripts/ ./scripts/
 # 👇 ecosystem.config.cjs는 더 이상 사용하지 않으므로 복사 라인을 주석 처리하거나 삭제합니다.
 # COPY ecosystem.config.cjs .
 COPY .env.*.enc .
-
 ENV NODE_ENV=production
 
 ENTRYPOINT ["/app/scripts/entrypoint.sh"]
 
+CMD ["pnpm", "exec", "pm2-runtime", "start", "ecosystem.config.cjs"]
