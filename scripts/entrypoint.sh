@@ -5,26 +5,26 @@
 if [ -z "$SECURE_KEY_CONTENT" ]; then
   echo "Error: SECURE_KEY_CONTENT is not set."
   exit 1
+
 fi
-
-# 환경변수로 받은 키 내용을 secure.key 파일로 생성
 echo "$SECURE_KEY_CONTENT" > /app/secure.key
-
-# 복호화 스크립트 실행 (경로 수정)
 echo "Decrypting environment files..."
 node /app/scripts/crypt.mjs decrypt
-
-# 👇 아래 로직 추가
-# 복호화된 .env.staging 또는 .env 파일을 공통 이름인 .env로 복사/이동
 if [ -f "/app/.env.staging" ]; then
   echo "Found .env.staging, renaming to .env"
   mv /app/.env.staging /app/.env
 elif [ -f "/app/.env" ]; then
   echo "Found .env, no rename needed."
-else
-  echo "Warning: No .env or .env.staging file found after decryption."
 fi
 
+# 👇 2. 복호화된 .env 파일의 변수들을 현재 셸 환경으로 로드
+if [ -f /app/.env ]; then
+  echo "Loading environment variables from .env file..."
+  export $(cat /app/.env | xargs)
+else
+  echo "FATAL: .env file not found after decryption. Halting."
+  exit 1
+fi
 
 # 👇 1. 데이터베이스 마이그레이션 실행
 echo "Running database migration..."
