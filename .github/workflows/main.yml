@@ -38,7 +38,6 @@ jobs:
         
           docker system prune -a -f
           docker pull ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:latest
-          
           docker stop stamp-app-main || true
           docker rm stamp-app-main || true
           
