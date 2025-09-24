@@ -21,10 +21,9 @@ else
   exit 1
 fi
 
-# 👇 2. 복호화된 .env 파일의 변수들을 현재 셸 환경으로 로드
 if [ -f /app/.env ]; then
   echo "Loading environment variables from .env file..."
-  export $(cat /app/.env | xargs)
+  export $(grep -v '^#' /app/.env | grep -v '^$' | xargs)
 else
   echo "FATAL: .env file not found after decryption. Halting."
   exit 1
