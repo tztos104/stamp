@@ -1,7 +1,7 @@
 // app/routes/admin/_layout.tsx (수정 완료)
 
-import { type LoaderFunctionArgs, json } from "@remix-run/node";
-import { Link, Outlet, useLoaderData, Form, useLocation } from "react-router";
+
+import { Link, Outlet, useLoaderData, Form, useLocation,type LoaderFunctionArgs } from "react-router";
 import { getSessionWithPermission } from "~/lib/auth.server";
 import { Home, Package, Users, LogOut, Menu, Monitor, Smartphone, Ticket } from "lucide-react"; // Ticket 아이콘 추가
 import {
@@ -11,6 +11,7 @@ import {
   SheetTitle,       // 👈 SheetTitle 추가
   SheetDescription, // 👈 SheetDescription 추가
   SheetTrigger,
+  SheetClose,
 } from "~/components/ui/sheet";
 import { Button } from "~/components/ui/button";
 import { Toaster } from "~/components/ui/sonner";
@@ -27,15 +28,21 @@ type LoaderData = {
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { user } = await getSessionWithPermission(request, "USER");
+   const { user } = await getSessionWithPermission(request, "ADMIN");
   
   const url = new URL(request.url);
   const view = url.searchParams.get("view") === "pc" ? "pc" : "mobile";
   const flashSession = await getFlashSession(request.headers.get("Cookie"));
   const toastMessage = flashSession.get("toast") || null;
  
-  return json({ user, view, toastMessage }, {
-    headers: { "Set-Cookie": await commitSession(flashSession) },
+  const data= { user, view, toastMessage };
+
+  // 👇 json() 헬퍼 대신 new Response()를 사용하여 서버 전용 패키지 의존성을 제거합니다.
+  return new Response(JSON.stringify(data), {
+    headers: {
+      "Content-Type": "application/json",
+      "Set-Cookie": await commitSession(flashSession),
+    },
   });
 };
 
@@ -136,24 +143,31 @@ function Header({ user, currentView }: { user: any, currentView: 'pc' | 'mobile'
 function SidebarNav() {
   return (
     <nav className="grid items-start px-2 text-sm font-medium lg:px-4 mt-4">
-      <Link to="/admin" className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
-        <Home className="h-4 w-4" /> 대시보드
-      </Link>
-     <Link
-        to="/admin/events"
-        className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
-      >
-        <Package className="h-4 w-4" />
-        이벤트 관리
-      </Link>
-      {/* 👇 회원 관리 링크 수정 */}
-      <Link to="/admin/users" className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
-        <Users className="h-4 w-4" /> 회원 관리
-      </Link>
-      {/* 👇 쿠폰 관리 링크 추가 */}
-      <Link to="/admin/coupons" className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
-        <Ticket className="h-4 w-4" /> 쿠폰 관리
-      </Link>
+      {/* 👇 각 Link를 SheetClose로 감싸줍니다. asChild prop이 핵심입니다. */}
+      <SheetClose asChild>
+        <Link to="/admin" className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
+          <Home className="h-4 w-4" /> 대시보드
+        </Link>
+      </SheetClose>
+      <SheetClose asChild>
+       <Link
+          to="/admin/events"
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+        >
+          <Package className="h-4 w-4" />
+          이벤트 관리
+        </Link>
+      </SheetClose>
+      <SheetClose asChild>
+        <Link to="/admin/users" className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
+          <Users className="h-4 w-4" /> 회원 관리
+        </Link>
+      </SheetClose>
+      <SheetClose asChild>
+        <Link to="/admin/coupons" className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
+          <Ticket className="h-4 w-4" /> 쿠폰 관리
+        </Link>
+      </SheetClose>
     </nav>
   );
 }

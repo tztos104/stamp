@@ -257,7 +257,7 @@ export default function SignupPage() {
 
           <Form {...form}>
             {/* hidden input은 더 이상 필요 없습니다. onSubmit에서 FormData에 직접 추가합니다. */}
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} method="post" className="space-y-4">
               <FormField
                 control={form.control}
                 name="name"

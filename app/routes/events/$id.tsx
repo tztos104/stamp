@@ -16,6 +16,8 @@ import { Label } from "~/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "~/components/ui/alert-dialog";
 import { format, intervalToDuration } from 'date-fns'; // intervalToDuration 추가
 import { ko } from 'date-fns/locale';
+import { Dialog, DialogContent } from "~/components/ui/dialog";
+import { DialogDescription, DialogTitle } from "@radix-ui/react-dialog";
 
 // ----------------------------------------------------
 // 1. Loader 함수: 참가 여부, 리뷰 작성 여부, 사용자 ID 추가 (변경 없음)
@@ -66,7 +68,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 export default function EventDetailPage() {
   const { event, isParticipant, hasReviewed, currentUserId } = useLoaderData<typeof loader>();
   const totalParticipants = event._count.participants + event._count.claimableStamps;
-
+  const [viewingImage, setViewingImage] = useState<string | null>(null);
   const startDate = new Date(event.startDate);
   const endDate = new Date(event.endDate);
   const duration = intervalToDuration({ start: startDate, end: endDate });
@@ -77,6 +79,7 @@ export default function EventDetailPage() {
   durationString = durationString ? `총 ${durationString} 진행` : '';
 
   return (
+     <>
     <div className="container mx-auto max-w-4xl py-3 space-y-6">
    
       <Card>
@@ -84,11 +87,16 @@ export default function EventDetailPage() {
           <Carousel className="w-full max-w-4xl mx-auto rounded-t-lg overflow-hidden">
             <CarouselContent>
               {event.images.map((image) => (
-                <CarouselItem key={image.id}>
-                  <div className="aspect-video bg-muted">
-                    <img src={image.url} alt={event.name} className="w-full h-full object-cover" />
-                  </div>
-                </CarouselItem>
+                 <CarouselItem key={image.id}>
+                    {/* 👇 2. 이미지를 클릭 가능한 버튼으로 감싸고 onClick 이벤트 추가 */}
+                    <button 
+                      type="button" 
+                      className="w-full aspect-video bg-muted block cursor-zoom-in"
+                      onClick={() => setViewingImage(image.url)}
+                    >
+                      <img src={image.url} alt={event.name} className="w-full h-full object-cover" />
+                    </button>
+                  </CarouselItem>
               ))}
             </CarouselContent>
             <CarouselPrevious className="left-4" />
@@ -157,7 +165,16 @@ export default function EventDetailPage() {
         </Button>
       </div>
     </div>
-
+<Dialog open={!!viewingImage} onOpenChange={(isOpen) => { if (!isOpen) setViewingImage(null); }}>
+    <DialogTitle></DialogTitle>
+    <DialogDescription></DialogDescription>
+        <DialogContent className="max-w-4xl p-2">
+            {viewingImage && (
+                <img src={viewingImage} alt="Event" className="w-full h-auto max-h-[85vh] object-contain rounded-md" />
+            )}
+        </DialogContent>
+      </Dialog>
+      </>
   );
 }
 

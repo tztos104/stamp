@@ -18,13 +18,13 @@ async function main() {
   console.log('Seeding started...');
 
   // 1. 관리자(ADMIN) 사용자 생성
-  const adminPhoneNumber = '01012345678';
+  const adminPhoneNumber = '01023112390';
   let adminUser = await db.user.findUnique({ where: { phoneNumber: adminPhoneNumber } });
 
   if (!adminUser) {
     adminUser = await db.user.create({
       data: {
-        name: '관리자',
+        name: '이영준',
         phoneNumber: adminPhoneNumber,
         status: 'ACTIVE',
         role: Role.ADMIN,
@@ -35,7 +35,7 @@ async function main() {
       data: {
         id: `password:${adminPhoneNumber}`,
         userId: adminUser.id,
-        hashedPassword: hashPassword('admin123'), // 실제 운영시에는 더 안전한 비밀번호 사용
+        hashedPassword: hashPassword('5425'), // 실제 운영시에는 더 안전한 비밀번호 사용
       },
     });
     console.log('✅ Admin user created.');
@@ -70,7 +70,7 @@ async function main() {
 
 
   // 3. 기본 카테고리 생성
-  const categories = ['방탈출', '보육원봉사', '장애인봉사', '기타'];
+  const categories = ['방탈출', '보육원봉사', '장애인봉사'];
   for (const name of categories) {
     await db.eventCategory.upsert({
       where: { name },
