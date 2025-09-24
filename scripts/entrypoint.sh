@@ -12,7 +12,7 @@ echo "Decrypting environment files..."
 node /app/scripts/crypt.mjs decrypt
 if [ "$APP_ENV" = "production" ]; then
   echo "Production environment detected. Using .env"
-  # .env 파일이 이미 존재하므로 별도 작업 필요 없음
+
 elif [ "$APP_ENV" = "development" ]; then
   echo "Development environment detected. Renaming .env.staging to .env"
   mv /app/.env.staging /app/.env
@@ -21,9 +21,10 @@ else
   exit 1
 fi
 
+
 if [ -f /app/.env ]; then
   echo "Loading environment variables from .env file..."
-  export $(grep -v '^#' /app/.env | grep -v '^$' | xargs)
+  export $(cat /app/.env | xargs)
 else
   echo "FATAL: .env file not found after decryption. Halting."
   exit 1
