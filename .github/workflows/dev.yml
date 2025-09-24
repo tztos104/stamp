@@ -48,6 +48,7 @@ jobs:
           docker run -d --name stamp-app-dev \
             -p 3001:3000 \
             -e SECURE_KEY_CONTENT='${{ secrets.SECURE_KEY_CONTENT }}' \
+            -e APP_ENV='development' \
             ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:dev
             
        

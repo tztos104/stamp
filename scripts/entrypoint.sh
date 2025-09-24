@@ -10,11 +10,15 @@ fi
 echo "$SECURE_KEY_CONTENT" > /app/secure.key
 echo "Decrypting environment files..."
 node /app/scripts/crypt.mjs decrypt
-if [ -f "/app/.env.staging" ]; then
-  echo "Found .env.staging, renaming to .env"
+if [ "$APP_ENV" = "production" ]; then
+  echo "Production environment detected. Using .env"
+  # .env 파일이 이미 존재하므로 별도 작업 필요 없음
+elif [ "$APP_ENV" = "development" ]; then
+  echo "Development environment detected. Renaming .env.staging to .env"
   mv /app/.env.staging /app/.env
-elif [ -f "/app/.env" ]; then
-  echo "Found .env, no rename needed."
+else
+  echo "FATAL: APP_ENV is not set or invalid. Halting."
+  exit 1
 fi
 
 # 👇 2. 복호화된 .env 파일의 변수들을 현재 셸 환경으로 로드
