@@ -42,7 +42,7 @@ jobs:
           docker rm stamp-app-main || true
           
           docker run -d --name stamp-app-main \
-            -p 3000:3000 \          
+            -p 3000:3000 \
             -e SECURE_KEY_CONTENT='${{ secrets.SECURE_KEY_CONTENT }}' \
             -e APP_ENV='production' \
             ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:latest
