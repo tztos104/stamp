@@ -26,12 +26,11 @@ jobs:
       with:
         context: .
         push: true
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:latest # 'latest' 태그 사용
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:latest 
 
     - name: Deploy to server
       uses: appleboy/ssh-action@master
       with:
-        # 👇 운영 서버용 Secret을 사용하도록 변경합니다.
         host: ${{ secrets.MAIN_HOST }}
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_KEY }}
@@ -44,11 +43,6 @@ jobs:
           docker rm stamp-app-main || true
           
           docker run -d --name stamp-app-main \
-            -p 3000:3000 \
-           
+            -p 3000:3000 \          
             -e SECURE_KEY_CONTENT='${{ secrets.SECURE_KEY_CONTENT }}' \
             ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:latest
-
-            sleep 10      
-            docker exec stamp-app-main npx prisma migrate deploy    
-            docker exec stamp-app-main npx prisma db seed
