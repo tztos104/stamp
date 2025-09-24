@@ -85,22 +85,31 @@ export function ParticipantManager({ participants, setParticipants }: {
 
  
   useEffect(() => {
-    if (phoneCheckFetcher.state === 'idle' && phoneCheckFetcher.data) {
+    // data가 없거나, fetcher가 idle 상태가 아니면 아무것도 하지 않음
+    if (phoneCheckFetcher.state !== 'idle' || !phoneCheckFetcher.data) {
+        return;
+    }
+    
+    if (phoneCheckFetcher.data.exists) {
+        toast.error("이미 등록된 회원입니다. 상단의 회원 검색을 이용해주세요.");
+         
+        setPhone("");
+    } else {
         const cleanPhone = phone.trim().replace(/-/g, "");
-        if (phoneCheckFetcher.data.exists) {
-            toast.error("이미 등록된 회원입니다. 상단의 회원 검색을 이용해주세요.");
-        } else {
-            addParticipant({
-                type: 'temp-phone',
-                id: cleanPhone,
-                name: name || `임시회원-${cleanPhone.slice(-4)}`,
-                detail: cleanPhone,
-            });
+        const success = addParticipant({
+            type: 'temp-phone',
+            id: cleanPhone,
+            name: name || `임시회원-${cleanPhone.slice(-4)}`,
+            detail: cleanPhone,
+        });
+        // 추가에 성공했을 때만 입력창을 비웁니다.
+        
             setName("");
             setPhone("");
-        }
+        
     }
-  }, [phoneCheckFetcher.state, phoneCheckFetcher.data, , name, phone, participants, addParticipant]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phoneCheckFetcher.data, phoneCheckFetcher.state]); 
 
   const addTempUserByCode = () => {
       const code = `CODE-${Date.now().toString(36).toUpperCase()}`;

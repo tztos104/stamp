@@ -181,7 +181,7 @@ export default function EventsIndexPage() {
             <p className="text-muted-foreground mt-2">다른 검색어나 필터를 사용해보세요.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6">
             {events.map((event) => (
               <Link to={`/events/${event.id}`} key={event.id} className="block">
                 <Card className="h-full flex flex-col hover:shadow-xl hover:-translate-y-1 transition-all duration-300">

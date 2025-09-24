@@ -22,7 +22,7 @@ const STAMPS_PER_CARD = 10;
 // HomePage에서 로드할 데이터의 타입 정의
 // user 정보는 RootLoaderData에서 가져올 것이므로 이 타입에서는 제외합니다.
 type HomePageLoaderData = {
-  user:{id:string, name:string};
+  user:{id:string, name:string} | null;
   currentStampCardsCount: number;
   availableCouponsCount: number;
   totalEventEntriesCount: number;
@@ -56,85 +56,66 @@ type HomePageLoaderData = {
 export const loader = async ({ request }: LoaderFunctionArgs): Promise<HomePageLoaderData | Response> => {
   const session = await getSession(request);
   const user = session.user; // 세션에서 userId 가져오기
-if(!user){
-   return redirect("/login?redirectTo=/");
-}
-  let currentStampCardsCount = 0;
-  let availableCouponsCount = 0;
-  let totalEventEntriesCount = 0;
-  let activeStampCard: HomePageLoaderData["activeStampCard"] = null;
-  
-  if (user.id) { // 사용자가 로그인했을 경우에만 데이터 조회
-    // 모든 스탬프 카드 (진행 중인 것과 완료된 것 모두)
-    currentStampCardsCount = await db.stampCard.count({
-      where: { userId: user.id },
-    });
-
-    // 사용 가능한 쿠폰 수 (StampCard를 통해 발급되었고, isUsed가 false인 쿠폰)
-    availableCouponsCount = await db.coupon.count({
-      where: {
-        stampCard: {
-          userId: user.id,
-        },
-        isUsed: false,
-      },
-    });
-
-    // 참여한 총 이벤트 개수 (StampEntry의 distinct eventId)
-    const distinctEventEntries = await db.stampEntry.findMany({
-      where: { userId: user.id },
-      select: { eventId: true },
-      distinct: ['eventId'],
-    });
-    totalEventEntriesCount = distinctEventEntries.length;
-
-    // 4. 가장 최근에 업데이트된 진행 중인 스탬프 카드 (card.tsx 로직과 동일)
-    let latestCardData = await db.stampCard.findFirst({
-      where: { userId: user.id, isRedeemed: false }, // 진행 중인 카드만
-      include: {
-        entries: {
-          orderBy: { createdAt: 'asc' }, // 스탬프 찍힌 순서대로
-          select: { // include 대신 select만 사용하고 필요한 필드를 모두 명시
-            id: true,
-            eventId: true,
-            createdAt: true,
-            isViewed: true,
-            event: { // event 관계를 select 안에 포함
-              select: {
-                name: true,
-                images: { select: { url: true }, take: 1 }
-              }
-            }
-          }
-        },
-        coupon: true, // 발급된 쿠폰 정보도 포함
-        
-      },
-      orderBy: { createdAt: 'asc' }, // 가장 최근에 업데이트된 카드를 가져옵니다.
-    });
-
-      if (latestCardData) {
-      const collectedStamps = latestCardData.entries.length;
-      activeStampCard = {
-        id: latestCardData.id,
-        collectedStamps: collectedStamps,
-        isRedeemed: latestCardData.isRedeemed,
-        coupon: latestCardData.coupon,
-        entries: latestCardData.entries.map(entry => ({
-          id: entry.id,
-          eventId: entry.eventId,
-          createdAt: entry.createdAt,
-          event: {
-            name: entry.event.name,
-            images: entry.event.images,
-          },
-          isViewed:entry.isViewed,
-        })),
-      };
-    }
+if (!user) {
+    return {
+      user: null,
+      currentStampCardsCount: 0,
+      availableCouponsCount: 0,
+      totalEventEntriesCount: 0,
+      activeStampCard: null,
+    };
   }
+  // 2. 사용자가 로그인한 경우 (기존 로직과 동일)
+  const currentStampCardsCount = await db.stampCard.count({
+    where: { userId: user.id },
+  });
 
-    
+  const availableCouponsCount = await db.coupon.count({
+    where: { stampCard: { userId: user.id }, isUsed: false },
+  });
+
+  const distinctEventEntries = await db.stampEntry.findMany({
+    where: { userId: user.id },
+    select: { eventId: true },
+    distinct: ['eventId'],
+  });
+  const totalEventEntriesCount = distinctEventEntries.length;
+
+  const latestCardData = await db.stampCard.findFirst({
+    where: { userId: user.id, isRedeemed: false },
+    include: {
+      entries: {
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          eventId: true,
+          createdAt: true,
+          isViewed: true,
+          event: { select: { name: true, images: { select: { url: true }, take: 1 } } }
+        }
+      },
+      coupon: true,
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  let activeStampCard: HomePageLoaderData["activeStampCard"] = null;
+  if (latestCardData) {
+    const collectedStamps = latestCardData.entries.length;
+    activeStampCard = {
+      id: latestCardData.id,
+      collectedStamps: collectedStamps,
+      isRedeemed: latestCardData.isRedeemed,
+      coupon: latestCardData.coupon,
+      entries: latestCardData.entries.map(entry => ({
+        id: entry.id,
+        eventId: entry.eventId,
+        createdAt: entry.createdAt,
+        event: { name: entry.event.name, images: entry.event.images },
+        isViewed: entry.isViewed,
+      })),
+    };
+  }
 
   // 객체를 직접 반환하여 React Router가 JSON 응답으로 처리하도록 합니다.
   return {

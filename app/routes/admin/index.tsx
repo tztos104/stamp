@@ -82,7 +82,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* 1. 핵심 지표 카드 (변경 없음) */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 ">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">총 사용자</CardTitle>
@@ -116,7 +116,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* 2. 최근 활동 목록 (레이아웃 수정 및 쿠폰 카드 추가) */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4">
         {/* 최근 가입 사용자 */}
         <Card className="lg:col-span-1">
           <CardHeader>

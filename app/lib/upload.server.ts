@@ -41,7 +41,7 @@ async function processAndUploadImage(file: File): Promise<string | null> {
       Key: filename,
       Body: optimizedBuffer,
       ContentType: 'image/webp',
-      ACL: 'public-read', // 이미지를 웹에서 바로 볼 수 있도록 public-read로 설정
+      
     });
 
     // S3로 명령어 전송 (업로드 실행)

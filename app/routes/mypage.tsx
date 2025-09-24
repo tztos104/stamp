@@ -97,7 +97,7 @@ export default function MyPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-bold">내 정보 수정</h1>
+        
       </div>
 
       {/* 이름 변경 카드 */}
@@ -107,10 +107,10 @@ export default function MyPage() {
           <CardDescription>계정의 기본 정보입니다.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-            <div className="font-medium">이름</div>
-            <p className="text-muted-foreground">{user.name}</p>
+            <div className="font-medium text-sm">이름</div>
+            <p className="text-muted-foreground font-bold">{user.name}</p>
             <div className="font-medium pt-2">전화번호</div>
-            <p className="text-muted-foreground">{user.phoneNumber} </p>
+            <p className="text-muted-foreground font-bold">{user.phoneNumber} </p>
         </CardContent>
       </Card>
 

@@ -1,11 +1,12 @@
 import { useEffect } from "react";
-import { Link, Outlet, useLoaderData, useLocation } from "react-router";
-import { type LoaderFunctionArgs, json } from "@remix-run/node";
+import { Link, Outlet, useLoaderData, useLocation,type LoaderFunctionArgs } from "react-router";
+
 import { Home, User, ShoppingCart, Settings, LogOut, LogIn,BookHeart, LayoutDashboard, Phone  } from "lucide-react";
 import { Toaster } from "~/components/ui/sonner";
 import { toast } from "sonner";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -18,7 +19,7 @@ import { Form } from "react-router";
 import { getSession } from "~/lib/auth.server";
 export type LoaderData = {
   toastMessage: {
-    type: "success" | "error";
+    type: "success" | "error"| "info" | "warning";
     message: string;
   } | null; // toastMessage는 객체이거나 null일 수 있습니다.
   user: {
@@ -29,16 +30,19 @@ export type LoaderData = {
 };
 
 // 2. loader 함수가 LoaderData 타입을 반환하도록 명시합니다.
-export const loader = async ({ request }: LoaderFunctionArgs): Promise<Response> => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
   const session = await getSession(request);
   const user = session.user;
-  const FlashSession = await getFlashSession(request.headers.get("Cookie"));
-  const toastMessage = FlashSession.get("toast") || null;
+  const flashSession = await getFlashSession(request.headers.get("Cookie"));
+  const toastMessage = flashSession.get("toast") || null;
 
   const data: LoaderData = { toastMessage ,user};
 
-  return json(data, {
-    headers: { "Set-Cookie": await commitSession(FlashSession) },
+  return new Response(JSON.stringify(data), {
+    headers: {
+      "Content-Type": "application/json",
+      "Set-Cookie": await commitSession(flashSession),
+    },
   });
 };
 
@@ -63,11 +67,7 @@ function Header() {
   );
 }
 
-function BottomNav({ user }: { user: {
-    name: string;
-    phoneNumber: string;
-    role: "USER" | "MEMBER" | "ADMIN" | null;
-  } | null }) {
+function BottomNav({ user }: { user: LoaderData['user'] }) {
 
      const { pathname } = useLocation(); // useLocation 훅 추가
   
@@ -96,10 +96,10 @@ function BottomNav({ user }: { user: {
         {user ? (
           <Sheet>
             <SheetTrigger asChild>
-              <button className={getNavLinkClass("/mypage")}> {/* 마이페이지도 활성 스타일 적용 가능 */}
+             <Link to="/mypage" className={getNavLinkClass("/mypage")}>
                 <User size={22} />
                 <span className="text-xs font-medium">마이페이지</span>
-              </button>
+              </Link>
             </SheetTrigger>
             <SheetContent className="w-[300px] sm:w-[400px]"> {/* Sheet 너비 조정 */}
               <SheetHeader className="mb-6">
@@ -115,17 +115,21 @@ function BottomNav({ user }: { user: {
               </SheetHeader>
               <div className="grid gap-4 py-4">
                 {user.role === "ADMIN" && ( // 관리자일 경우에만 관리자 페이지 링크 표시
+                   <SheetClose asChild>
+                    <Button variant="outline" asChild className="justify-start">
+                      <Link to="/admin" className="text-gray-800">
+                        <LayoutDashboard className="mr-2 h-5 w-5" /> 관리자 페이지
+                      </Link>
+                    </Button>
+                  </SheetClose>
+                )}
+                      <SheetClose asChild>
                   <Button variant="outline" asChild className="justify-start">
-                    <Link to="/admin" className="text-gray-800"> {/* 관리자 페이지는 좀 더 강조 */}
-                      <LayoutDashboard className="mr-2 h-5 w-5" /> 관리자 페이지
+                    <Link to="/mypage" className="text-gray-800">
+                      <Settings className="mr-2 h-5 w-5 text-gray-600" /> 내 정보 수정
                     </Link>
                   </Button>
-                )}
-                <Button variant="outline" asChild className="justify-start">
-                  <Link to="/mypage" className="text-gray-800">
-                    <Settings className="mr-2 h-5 w-5 text-gray-600" /> 내 정보 수정
-                  </Link>
-                </Button>
+                </SheetClose>
                 <Form action="/logout" method="post" className="mt-4">
                   <Button type="submit" variant="destructive" className="w-full justify-start">
                     <LogOut className="mr-2 h-5 w-5" /> 로그아웃
@@ -149,16 +153,24 @@ export default function MobileLayout() {
   const { user, toastMessage } = useLoaderData<LoaderData>();
   useEffect(() => {
     if (toastMessage) {
-      if (toastMessage.type === 'success') {
-        toast.success(toastMessage.message);
+      switch (toastMessage.type) {
+        case 'success':
+          toast.success(toastMessage.message);
+          break;
+        case 'error':
+          toast.error(toastMessage.message);
+          break;
+        // 추후 info, warning 등 다른 타입도 추가 가능
+        default:
+          toast(toastMessage.message);
+          break;
       }
-      // 추후 error, info 등 다른 타입의 토스트도 추가할 수 있습니다.
     }
   }, [toastMessage]);
   return (
     <div className="max-w-md mx-auto bg-gray-50 min-h-screen flex flex-col">
       <Header />
-      <main className="flex-1 p-4">
+      <main className="flex-1 ">
         {/* 이 부분에 각 페이지의 실제 내용이 들어옵니다 */}
         <Outlet />
       </main>

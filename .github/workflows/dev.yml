@@ -36,21 +36,19 @@ jobs:
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.DEV_HOST }}
-        username: ${{ secrets.DEV_USERNAME }}
-        key: ${{ secrets.DEV_SSH_KEY }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
         script: |
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:dev
           
+          docker system prune -a -f
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:dev
           docker stop stamp-app-dev || true
           docker rm stamp-app-dev || true
           
           docker run -d --name stamp-app-dev \
             -p 3001:3000 \
             -e SECURE_KEY_CONTENT='${{ secrets.SECURE_KEY_CONTENT }}' \
-         
-            -e AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}' \
-            -e AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}' \
-            -e AWS_REGION='${{ secrets.AWS_REGION }}' \
-            -e S3_BUCKET_NAME='${{ secrets.DEV_S3_BUCKET_NAME }}' \
-       
             ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:dev
+            
+       
+   

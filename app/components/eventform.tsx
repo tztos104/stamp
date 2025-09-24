@@ -69,9 +69,14 @@ export function EventForm({ fetcher, categories, defaultValues }: EventFormProps
     });
 
     // 수정 모드일 때, 이미지와 참가자 목록의 초기 상태를 설정합니다.
-useEffect(() => {
-        if (isEditing && defaultValues?.participants) {
-            setParticipants(defaultValues.participants);
+    useEffect(() => {
+        if (isEditing && defaultValues) {
+            if (defaultValues.participants) {
+                setParticipants(defaultValues.participants);
+            }
+            if (defaultValues.images) {
+                setExistingImages(defaultValues.images);
+            }
         }
     }, [isEditing, defaultValues]);
 
