@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { Users, Package, Ticket } from "lucide-react";
 import { format } from "date-fns";
-import { ko } from "date-fns/locale";
+
 
 // --- Loader: 대시보드에 필요한 모든 데이터를 불러옵니다. ---
 export const loader = async ({ request }: LoaderFunctionArgs) => {

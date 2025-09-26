@@ -9,7 +9,7 @@ import { StampSlot } from "~/components/stampSlot";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { useState, useEffect } from "react";
 import { Badge } from "~/components/ui/badge";
-import { Calendar, Gift, Star, Users } from "lucide-react";
+import { AwardIcon, Calendar, Gift, Star, Users } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { format } from "date-fns/format";
 import { toast } from "sonner";
@@ -25,17 +25,19 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return redirect("/login?redirectTo=/card");
   }
 
-  // 1. 현재 사용자가 채우고 있는 카드 (isRedeemed: false)
-  let stampCards = await db.stampCard.findMany({
+ let stampCards = await db.stampCard.findMany({
     where: { userId: user.id },
     include: {
       entries: {
         orderBy: { createdAt: 'asc' },
-        include: { event: { select: { id: true , name: true } } } // 이벤트 이미지 추가
+       
+        include: { 
+            event: { select: { id: true , name: true } },
+        }
       },
-      coupon: true, // 발급된 쿠폰 정보도 포함
+      coupon: true,
     },
-    orderBy: { createdAt: 'desc' }, // 최신 카드를 먼저 보여주기 위해
+    orderBy: { createdAt: 'desc' },
   });
 
   // 2. 사용 중인 카드가 없다면 새로 생성
@@ -70,6 +72,8 @@ export default function MyStampCardPage() {
   const fetcher = useFetcher();
   const issueCouponFetcher = useFetcher();
   const [viewingEventId, setViewingEventId] = useState<string | null>(null);
+  const [viewingAdminNote, setViewingAdminNote] = useState<string | null>(null);
+
   const revalidator = useRevalidator();
 
   useEffect(() => {
@@ -89,10 +93,13 @@ export default function MyStampCardPage() {
     }
   }, [issueCouponFetcher.state, issueCouponFetcher.data, revalidator]);
   
-  const handleStampClick = (eventId: string) => {
-    setViewingEventId(eventId);
+  const handleStampClick = (data: string | { adminNote: string | null }) => {
+    if (typeof data === 'string') {
+        setViewingEventId(data);
+    } else {
+        setViewingAdminNote(data.adminNote || '별도의 사유가 기재되지 않았습니다.');
+    }
   };
-
  // 스탬프 카드 분류: 진행 중 (미사용) vs. 완료됨 (사용됨)
   const activeCards = stampCards.filter(card => !card.isRedeemed);
   const redeemedCards = stampCards.filter(card => card.isRedeemed);
@@ -329,6 +336,22 @@ export default function MyStampCardPage() {
           )}
         </DialogContent>
       </Dialog>
+<Dialog open={!!viewingAdminNote} onOpenChange={(isOpen) => { if (!isOpen) setViewingAdminNote(null); }}>
+        <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <AwardIcon className="h-6 w-6 text-primary" />
+                    관리자 발급 스탬프
+                </DialogTitle>
+                <DialogDescription className="pt-4 text-base text-foreground">
+                    발급 사유: {viewingAdminNote}
+                </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+                <Button onClick={() => setViewingAdminNote(null)}>확인</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Toaster richColors /> {/* Toast 컴포넌트 추가 */}
     </>
   );

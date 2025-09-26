@@ -11,11 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~
 import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext } from "~/components/ui/pagination";
 import { Badge } from "~/components/ui/badge";
 import { Award, Calendar, CreditCard, Phone, Search, UserCircle } from "lucide-react";
-import { Prisma, Role, UserStatus } from "@prisma/client";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { useState } from "react";
-
+import type { Prisma, Role, UserStatus } from "@prisma/client";
 const USERS_PER_PAGE = 10;
 
 // --- Loader: 사용자 목록을 검색/필터링/페이지네이션 기능과 함께 불러옵니다. ---
@@ -88,20 +87,22 @@ export default function AdminUsersPage() {
   };
  const getRoleBadgeVariant = (userRole: Role|null) => {
     switch (userRole) {
-      case Role.ADMIN: return "destructive";
-      case Role.MEMBER: return "default";
-      case Role.USER: return "outline";
+      case "ADMIN": return "destructive"; 
+      case "MEMBER": return "default";  
+      case "USER": return "outline";    
       default: return "secondary";
     }
   };
 
-  const getStatusBadgeVariant = (userStatus: UserStatus) => {
+
+   const getStatusBadgeVariant = (userStatus: UserStatus) => {
     switch (userStatus) {
-      case UserStatus.ACTIVE: return "secondary"; // "success" 대신 기본 secondary 사용
-      case UserStatus.TEMPORARY: return "outline"; // "warning" 대신 기본 outline 사용
+      case "ACTIVE": return "secondary";     // 👈 UserStatus.ACTIVE 대신 문자열 "ACTIVE" 사용
+      case "TEMPORARY": return "outline";  // 👈 UserStatus.TEMPORARY 대신 문자열 "TEMPORARY" 사용
       default: return "secondary";
     }
   };
+
  return (
     <div className="flex flex-col gap-4">
       <Card>
@@ -128,9 +129,9 @@ export default function AdminUsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">모든 역할</SelectItem>
-                  <SelectItem value={Role.USER}>일반사용자</SelectItem>
-                  <SelectItem value={Role.MEMBER}>멤버</SelectItem>
-                  <SelectItem value={Role.ADMIN}>관리자</SelectItem>
+                 <SelectItem value="USER">일반사용자</SelectItem>
+                  <SelectItem value="MEMBER">멤버</SelectItem>
+                  <SelectItem value="ADMIN">관리자</SelectItem>
                 </SelectContent>
               </Select>
               <Select name="status" defaultValue={status || "all"}>
@@ -139,8 +140,8 @@ export default function AdminUsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">모든 상태</SelectItem>
-                  <SelectItem value={UserStatus.ACTIVE}>활성</SelectItem>
-                  <SelectItem value={UserStatus.TEMPORARY}>임시</SelectItem>
+                  <SelectItem value="ACTIVE">활성</SelectItem>
+                  <SelectItem value="TEMPORARY">임시</SelectItem>
                 </SelectContent>
               </Select>
               <Button type="submit" className="w-full md:w-auto"><Search className="h-4 w-4 mr-2" /> 검색</Button>

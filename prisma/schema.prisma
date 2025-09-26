@@ -94,8 +94,10 @@ model StampEntry {
   createdAt   DateTime @default(now())
   userId      String
   user        User     @relation(fields: [userId], references: [id])
-  eventId     String
-  event       Event    @relation(fields: [eventId], references: [id])
+  eventId     String?
+  event       Event?   @relation(fields: [eventId], references: [id])
+  adminNote   String?
+
   stampCardId Int
   stampCard   StampCard @relation(fields: [stampCardId], references: [id])
   isViewed    Boolean  @default(false)

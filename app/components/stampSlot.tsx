@@ -3,22 +3,23 @@
 import { useFetcher } from "react-router"; // react-router-dom으로 변경
 import { useState } from "react";
 import { Gift } from "lucide-react";
-import { DefaultStamp } from "./stamp";
+import { AwardStamp, DefaultStamp } from "./stamp";
 
 // Stamp 타입에 eventId를 포함하도록 수정합니다.
 type Stamp = {
   id: number;
   isViewed: boolean;
-  eventId: string; // 👈 이벤트 ID 추가!
+  eventId: string | null; 
   event: {
     name: string;
-  };
+  } | null; 
+  adminNote: string | null; 
 };
 
 // 부모 컴포넌트로부터 stamp 객체와 클릭 핸들러 함수를 props로 받습니다.
 interface StampSlotProps {
   stamp: Stamp;
-  onStampClick: (eventId: string) => void; // 👈 클릭 시 eventId를 전달할 함수
+  onStampClick: (data: string | Stamp) => void;
 }
 
 export function StampSlot({ stamp, onStampClick }: StampSlotProps) {
@@ -53,18 +54,25 @@ export function StampSlot({ stamp, onStampClick }: StampSlotProps) {
       </button>
     );
   }
-
+  if (stamp.eventId) {
+    return (
+      <button
+        onClick={() => onStampClick(stamp.eventId!)} // non-null assertion
+        className="aspect-square w-full rounded-full transition-all transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        aria-label={`${stamp.event?.name} 이벤트 정보 보기`}
+      >
+        <DefaultStamp />
+      </button>
+    );
+  }
   // 👇 이미 열어본 스탬프: 클릭 가능한 버튼으로 감싸고 onClick 핸들러 추가
   return (
     <button
-      onClick={() => onStampClick(stamp.eventId)}
-      className="aspect-square w-full rounded-full transition-all transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-      aria-label={`${stamp.event.name} 이벤트 정보 보기`}
+        onClick={() => onStampClick(stamp)} // stamp 객체 전체를 전달
+        className="aspect-square w-full rounded-full transition-all transform hover:scale-105 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+        aria-label={`관리자 발급 스탬프 정보 보기`}
     >
-      <DefaultStamp>
-        {/* 도장 안에 이벤트 이름을 넣을 수도 있습니다 (선택 사항) */}
-        {/* <span className="text-xs text-center">{stamp.event.name}</span> */}
-      </DefaultStamp>
+      <AwardStamp />
     </button>
   );
 }
