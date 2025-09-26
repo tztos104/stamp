@@ -281,7 +281,7 @@ export default function UserDetailPage() {
                 <CardContent>
                     {isEditing ? (
                         <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4">
                             <div>
                                 <Label htmlFor="role">역할</Label>
                                 <Select name="role" defaultValue={user.role || "USER"}>
@@ -309,7 +309,7 @@ export default function UserDetailPage() {
                         </Button>
                         </>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4">
                             <div>
                                 <Label>역할</Label>
                                 <Badge variant={getRoleBadgeVariant(user.role)} className="block w-fit mt-2">{user.role}</Badge>
