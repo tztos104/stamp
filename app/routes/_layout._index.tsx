@@ -9,7 +9,7 @@ import { type LoaderFunctionArgs, useLoaderData, Link, redirect, useFetcher } fr
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import { Award, Calendar, CreditCard, Sparkles, Star, Users } from "lucide-react";
+import { Award, AwardIcon, Calendar, CreditCard, Sparkles, Star, Users } from "lucide-react";
 
 import { getSession } from "~/lib/auth.server";
 import { db } from "~/lib/db.server";
@@ -20,37 +20,29 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 const STAMPS_PER_CARD = 10;
 
 // HomePage에서 로드할 데이터의 타입 정의
-// user 정보는 RootLoaderData에서 가져올 것이므로 이 타입에서는 제외합니다.
 type HomePageLoaderData = {
   user:{id:string, name:string} | null;
   currentStampCardsCount: number;
   availableCouponsCount: number;
   totalEventEntriesCount: number;
-  activeStampCard: { // card.tsx와 동일한 구조 유지
+  activeStampCard: {
     id: number;
     collectedStamps: number;
     isRedeemed: boolean;
-    coupon: {
-      id: string;
-      description: string;
-      code: string;
-      expiresAt: Date;
-      isUsed: boolean;
-      createdAt: Date;
-    } | null;
+    coupon: { /* ... */ } | null;
     entries: Array<{
       id: number;
-      eventId: string;
+      eventId: string | null; 
       createdAt: Date;
       event: {
         name: string;
-        images: Array<{ url: string }>; // 이벤트 이미지 배열
-      };
+        images: Array<{ url: string }>;
+      } | null; 
       isViewed: boolean;
+      adminNote: string | null; 
     }>;
-  } | null;// 진행 중인 카드가 없을 수도 있으므로 null 허용
+  } | null;
 };
-
 
 // HomePage의 loader 함수
 export const loader = async ({ request }: LoaderFunctionArgs): Promise<HomePageLoaderData | Response> => {
@@ -81,7 +73,7 @@ if (!user) {
   });
   const totalEventEntriesCount = distinctEventEntries.length;
 
-  const latestCardData = await db.stampCard.findFirst({
+const latestCardData = await db.stampCard.findFirst({
     where: { userId: user.id, isRedeemed: false },
     include: {
       entries: {
@@ -91,6 +83,7 @@ if (!user) {
           eventId: true,
           createdAt: true,
           isViewed: true,
+          adminNote: true, 
           event: { select: { name: true, images: { select: { url: true }, take: 1 } } }
         }
       },
@@ -111,8 +104,9 @@ if (!user) {
         id: entry.id,
         eventId: entry.eventId,
         createdAt: entry.createdAt,
-        event: { name: entry.event.name, images: entry.event.images },
+        event: entry.event ? { name: entry.event.name, images: entry.event.images } : null,
         isViewed: entry.isViewed,
+        adminNote: entry.adminNote,
       })),
     };
   }
@@ -139,16 +133,23 @@ export default function HomePage() {
     totalEventEntriesCount,
     activeStampCard
   } = useLoaderData<HomePageLoaderData>();
- const fetcher = useFetcher(); // 이벤트 상세 정보를 로드하기 위함
-  const [viewingEventId, setViewingEventId] = useState<string | null>(null)
+  const fetcher = useFetcher(); // 이벤트 상세 정보를 로드하기 위함
+  const [viewingEventId, setViewingEventId] = useState<string | null>(null);
+  const [viewingAdminNote, setViewingAdminNote] = useState<string | null>(null);
+
+
 useEffect(() => {
     if (viewingEventId) {
       fetcher.load(`/api/events/${viewingEventId}`); // API 라우트로 이벤트 상세 정보 요청
     }
   }, [viewingEventId]);
 
-  const handleStampClick = (eventId: string) => {
-    setViewingEventId(eventId);
+   const handleStampClick = (data: string | { adminNote: string | null }) => {
+    if (typeof data === 'string') {
+        setViewingEventId(data);
+    } else {
+        setViewingAdminNote(data.adminNote || '별도의 사유가 기재되지 않았습니다.');
+    }
   };
 
    const collectedStamps = activeStampCard?.collectedStamps || 0;
@@ -303,6 +304,22 @@ useEffect(() => {
           )}
         </DialogContent>
       </Dialog>
+ <Dialog open={!!viewingAdminNote} onOpenChange={(isOpen) => { if (!isOpen) setViewingAdminNote(null); }}>
+        <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <AwardIcon className="h-6 w-6 text-primary" />
+                    관리자 발급 스탬프
+                </DialogTitle>
+                <DialogDescription className="pt-4 text-base text-foreground">
+                    {viewingAdminNote}
+                </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+                <Button onClick={() => setViewingAdminNote(null)}>확인</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
     </>
   );
 }
