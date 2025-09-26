@@ -44,7 +44,9 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
   });
 
   if (!user) throw new Response("User not found", { status: 404 });
- const formattedUser = {
+
+  // --- 날짜 포맷팅 로직 ---
+  const formattedUser = {
     ...user,
     createdAtFormatted: format(new Date(user.createdAt), "yyyy.MM.dd", { locale: ko }),
     StampCard: user.StampCard.map(card => ({
@@ -60,34 +62,26 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
       createdAtFormatted: format(new Date(entry.createdAt), "yyyy.MM.dd")
     }))
   };
-  // --- 활동 로그 데이터 생성 ---
-  const stampActivities = user.eventEntries.map(entry => {
-    // 👇 요청하신 대로 텍스트를 변경합니다.
-    const description = entry.event 
-      ? "이벤트로 인한 스탬프 참여" 
-      : "admin 도장 발급";
-    const link = entry.event ? `/admin/events/${entry.event.id}` : `/admin/users/${userId}`;
 
-    return {
-      type: '스탬프 적립' as const,
-      date: entry.createdAt,
-      description,
-      link
-    };
-  });
+  const stampActivities = user.eventEntries.map(entry => ({
+    type: '스탬프 적립' as const,
+    date: format(new Date(entry.createdAt), "yyyy.MM.dd HH:mm"),
+    description: entry.event ? `'${entry.event.name}' 이벤트 참여` : `admin 도장 발급: ${entry.adminNote || ''}`,
+    link: entry.event ? `/admin/events/${entry.event.id}` : `/admin/users/${userId}`
+  }));
 
   const reviewActivities = user.reviews.map(review => ({
     type: '리뷰 작성' as const,
-    date: review.createdAt,
+    date: format(new Date(review.createdAt), "yyyy.MM.dd HH:mm"),
     description: `'${review.event.name}' 이벤트에 별점 ${review.rating}점 리뷰 작성`,
     link: `/admin/events/${review.event.id}`
   }));
   
   const couponActivities = user.StampCard.filter(card => card.coupon).map(card => ({
-      type: '쿠폰 발급' as const,
-      date: card.coupon!.createdAt,
-      description: `스탬프 카드 보상으로 쿠폰 발급 (${card.coupon!.code})`,
-      link: `/admin/coupons`
+    type: '쿠폰 발급' as const,
+    date: format(new Date(card.coupon!.createdAt), "yyyy.MM.dd HH:mm"),
+    description: `스탬프 카드 보상으로 쿠폰 발급 (${card.coupon!.code})`,
+    link: `/admin/coupons`
   }));
 
   const allActivities = [...stampActivities, ...reviewActivities, ...couponActivities]
@@ -95,6 +89,7 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
   
   return { user: formattedUser, activities: allActivities };
 };
+
 
 // --- Action: 사용자 정보 수정, 스탬프 추가/삭제 로직을 처리합니다. ---
 export const action = async ({ request, params }: ActionFunctionArgs) => {
