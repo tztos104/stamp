@@ -35,15 +35,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const flashSession = await getFlashSession(request.headers.get("Cookie"));
   const toastMessage = flashSession.get("toast") || null;
  
-  const data= { user, view, toastMessage };
 
-  // 👇 json() 헬퍼 대신 new Response()를 사용하여 서버 전용 패키지 의존성을 제거합니다.
-  return new Response(JSON.stringify(data), {
+
+  return {user,view, toastMessage,
     headers: {
       "Content-Type": "application/json",
       "Set-Cookie": await commitSession(flashSession),
     },
-  });
+  };
 };
 
 // --- PC 버전 레이아웃 컴포넌트 (변경 없음) ---
