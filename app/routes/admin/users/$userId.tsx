@@ -44,7 +44,22 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
   });
 
   if (!user) throw new Response("User not found", { status: 404 });
-
+ const formattedUser = {
+    ...user,
+    createdAtFormatted: format(new Date(user.createdAt), "yyyy.MM.dd", { locale: ko }),
+    StampCard: user.StampCard.map(card => ({
+      ...card,
+      createdAtFormatted: format(new Date(card.createdAt), "yyyy.MM.dd"),
+      coupon: card.coupon ? {
+          ...card.coupon,
+          createdAtFormatted: format(new Date(card.coupon.createdAt), "yyyy.MM.dd")
+      } : null
+    })),
+    eventEntries: user.eventEntries.map(entry => ({
+      ...entry,
+      createdAtFormatted: format(new Date(entry.createdAt), "yyyy.MM.dd")
+    }))
+  };
   // --- 활동 로그 데이터 생성 ---
   const stampActivities = user.eventEntries.map(entry => {
     // 👇 요청하신 대로 텍스트를 변경합니다.
@@ -78,7 +93,7 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
   const allActivities = [...stampActivities, ...reviewActivities, ...couponActivities]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   
-  return { user, activities: allActivities };
+  return { user: formattedUser, activities: allActivities };
 };
 
 // --- Action: 사용자 정보 수정, 스탬프 추가/삭제 로직을 처리합니다. ---
@@ -271,7 +286,7 @@ export default function UserDetailPage() {
                         </CardTitle>
                         <CardDescription className="mt-2 flex items-center gap-4">
                             <span className="flex items-center gap-1.5"><Phone className="h-4 w-4" />{user.phoneNumber}</span>
-                            <span className="flex items-center gap-1.5"><Calendar className="h-4 w-4" />가입일: {format(new Date(user.createdAt), "yyyy.MM.dd", { locale: ko })}</span>
+                            <span className="flex items-center gap-1.5"><Calendar className="h-4 w-4" />가입일: {user.createdAtFormatted}</span>
                         </CardDescription>
                     </div>
                     <Button type="button" onClick={() => setIsEditing(!isEditing)} variant="outline" size="sm">
@@ -347,7 +362,7 @@ export default function UserDetailPage() {
                                 )}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                                {format(new Date(entry.createdAt), "yyyy.MM.dd")} 적립
+                                {entry.createdAtFormatted} 적립
                             </p>
                         </div>
                         <DeleteStampDialog stampEntryId={entry.id} />
@@ -375,7 +390,7 @@ export default function UserDetailPage() {
                     <TableBody>
                         {activities.length > 0 ? activities.map((activity: any, index: number) => (
                             <TableRow key={index}>
-                                <TableCell className="text-xs text-muted-foreground">{format(new Date(activity.date), "yyyy.MM.dd HH:mm")}</TableCell>
+                                <TableCell className="text-xs text-muted-foreground">{activity.date}</TableCell>
                                 <TableCell>
                                     <Badge variant="outline" className="flex items-center gap-1.5 w-fit">
                                         <ActivityIcon type={activity.type} /> {activity.type}
@@ -406,7 +421,7 @@ export default function UserDetailPage() {
                                 스탬프 {card._count.entries} / 10
                                 {card.isRedeemed && <Badge className="ml-2">보상 완료</Badge>}
                             </div>
-                            <p className="text-xs text-muted-foreground">생성일: {format(new Date(card.createdAt), "yyyy.MM.dd")}</p>
+                            <p className="text-xs text-muted-foreground">생성일: {card.createdAtFormatted}</p>
                         </div>
                         <div className="flex items-center gap-2">
                             {card.coupon && <Badge variant="outline" className="flex items-center gap-1"><Ticket className="h-3 w-3" /> 쿠폰 발급됨</Badge>}
