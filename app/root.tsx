@@ -9,7 +9,7 @@ import {
 import { LocalizationProvider } from '@mui/x-date-pickers'; 
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'; 
 import {ko} from 'date-fns/locale/ko'; // 
-
+import { ThemeProvider } from "next-themes";
 import type { Route } from "./+types/root";
 import "./app.css";
 
@@ -36,7 +36,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+        {children}</ThemeProvider>
         <ScrollRestoration />
         <Scripts />
       </body>
