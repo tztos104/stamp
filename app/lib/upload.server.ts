@@ -1,68 +1,61 @@
-// app/lib/upload.server.ts (S3 업로드 방식으로 수정)
-
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+// app/lib/upload.server.ts (스트리밍 방식으로 전면 수정)
+import { PassThrough } from "stream";
+import { S3Client } from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
+import type { UploadHandler } from "@remix-run/node";
 import sharp from "sharp";
 
-// S3 클라이언트 초기화. 
-// AWS 자격 증명(Access Key, Secret Key)은 환경 변수에서 자동으로 읽어옵니다.
+// S3 클라이언트 초기화
 const s3Client = new S3Client({
   region: process.env.AWS_REGION!,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  }
+  },
 });
 
 const BUCKET_NAME = process.env.S3_BUCKET_NAME!;
 
-/**
- * 업로드된 이미지 파일을 WebP 형식으로 변환하여 S3에 업로드하고,
- * 해당 파일의 URL을 반환합니다.
- * @param file 업로드된 File 객체
- * @returns 저장된 파일의 URL 경로 (예: https://bucket-name.s3.region.amazonaws.com/uploads/image.webp)
- */
-async function processAndUploadImage(file: File): Promise<string | null> {
-  if (!file || file.size === 0) return null;
+// 스트림을 받아서 sharp으로 변환하고 다시 스트림으로 반환하는 함수
+function processImageStream() {
+  const passthrough = new PassThrough();
+  const sharpStream = sharp()
+    .resize({ width: 800, height: 800, fit: "inside", withoutEnlargement: true })
+    .webp({ quality: 80 });
+  
+  return passthrough.pipe(sharpStream);
+}
 
-  try {
-    const buffer = Buffer.from(await file.arrayBuffer());
 
-    // sharp를 사용해 이미지를 리사이징하고 WebP 버퍼로 변환
-    const optimizedBuffer = await sharp(buffer)
-      .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 80 })
-      .toBuffer();
-
-    const filename = `uploads/image-${Date.now()}-${Math.round(Math.random() * 1E9)}.webp`;
-
-    // S3에 업로드하기 위한 명령어 생성
-    const command = new PutObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: filename,
-      Body: optimizedBuffer,
-      ContentType: 'image/webp',
-      
-    });
-
-    // S3로 명령어 전송 (업로드 실행)
-    await s3Client.send(command);
-
-    // 업로드된 파일의 최종 URL 반환
-    return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${filename}`;
-
-  } catch (error) {
-    console.error("S3 업로드 실패:", error);
-    return null;
+export const s3UploadHandler: UploadHandler = async ({ name, data, filename }) => {
+  // 'images' 필드에 대한 업로드만 처리합니다.
+  if (name !== "images" && name !== "newImages") {
+    return undefined;
   }
-}
 
-/**
- * 여러 개의 이미지 파일을 받아 처리하고 URL 배열을 반환합니다.
- * @param files File 객체의 배열
- * @returns 저장된 파일들의 URL 경로 배열
- */
-export async function uploadImages(files: File[]): Promise<string[]> {
-    const uploadPromises = files.map(file => processAndUploadImage(file));
-    const urls = await Promise.all(uploadPromises);
-    return urls.filter((url): url is string => url !== null);
-}
+  const processedImageStream = processImageStream();
+
+  // 스트림을 S3로 업로드
+  const upload = new Upload({
+    client: s3Client,
+    params: {
+      Bucket: BUCKET_NAME,
+      Key: `uploads/image-${Date.now()}-${filename}.webp`,
+      Body: processedImageStream,
+      ContentType: "image/webp",
+    },
+  });
+
+  // 비동기 스트림 데이터를 파이프로 연결
+  // data는 AsyncIterable<Uint8Array> 타입입니다.
+  for await (const chunk of data) {
+    processedImageStream.write(chunk);
+  }
+  processedImageStream.end();
+
+  await upload.done();
+
+  // 업로드된 파일의 최종 URL 반환
+  const url = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${(await upload.done()).Key}`;
+  return url;
+};

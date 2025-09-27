@@ -5,10 +5,11 @@ import { useLoaderData, useFetcher, type LoaderFunctionArgs, type ActionFunction
 import { db } from "~/lib/db.server";
 import { EventForm } from "~/components/eventform"; // 👈 재사용 폼 컴포넌트
 import { getFlashSession, commitSession } from "~/lib/session.server";
-import { uploadImages } from "~/lib/upload.server";
+import { s3UploadHandler  } from "~/lib/upload.server";
 import type { Participant } from "~/components/participantManager";
 import * as z from 'zod';
 import dayjs from 'dayjs';
+import { unstable_parseMultipartFormData } from "@remix-run/node";
 
 // loader: URL의 eventId를 사용해 수정할 이벤트의 데이터를 불러옵니다.
 export const loader = async ({ params }: LoaderFunctionArgs) => {
@@ -101,7 +102,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         throw new Response("이벤트가 없습니다.", { status: 400 });
     }
 
-    const formData = await request.formData();
+    const formData = await unstable_parseMultipartFormData(
+        request,
+        s3UploadHandler // 👈 스트리밍 업로드 핸들러를 사용합니다.
+    );
     const flashSession = await getFlashSession(request.headers.get("Cookie"));
     const result = eventFormSchema.safeParse({
         ...Object.fromEntries(formData),
@@ -129,8 +133,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const { name, description, categoryId, isAllDay, startDate, endDate } = result.data;
 
     // 2. 이미지 및 참가자 데이터는 별도로 처리합니다.
-    const newImageFiles = formData.getAll("newImages") as File[];
-    const newImageUrls = await uploadImages(newImageFiles);
+    const newImageUrls = formData.getAll("newImages") as string[];
+    
     const participants: Participant[] = JSON.parse(formData.get("participants") as string);
     const existingImageIds: number[] = JSON.parse(formData.get("existingImageIds") as string || '[]');
 

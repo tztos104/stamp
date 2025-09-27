@@ -9,12 +9,12 @@ import {
 } from 'react-router';
 import * as z from 'zod';
 import { db } from '~/lib/db.server';
-import { uploadImages } from "~/lib/upload.server";
+import { s3UploadHandler } from "~/lib/upload.server";
 import { commitSession, getFlashSession } from '~/lib/session.server';
 import { EventForm } from "~/components/eventform";
 import type { Participant } from '~/components/participantManager';
 import dayjs from 'dayjs';
-import { json } from '@remix-run/node';
+import { json, unstable_parseMultipartFormData } from '@remix-run/node';
 
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -54,8 +54,11 @@ const eventFormSchema = z.object({
 
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-	const formData = await request.formData();
-  
+	const formData =  await unstable_parseMultipartFormData(
+    request,
+    s3UploadHandler // 👈 우리가 만든 스트리밍 업로드 핸들러를 사용합니다.
+  );
+  const imageUrls = formData.getAll("images") as string[];
     const participantsJSON = formData.get("participants") as string;
     // 참가자 데이터가 비어있거나 잘못된 형식일 경우를 대비한 방어 코드
     const participants: Participant[] = participantsJSON ? JSON.parse(participantsJSON) : [];
@@ -90,12 +93,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const { name, description, categoryId, isAllDay, startDate, endDate } = result.data;
 
     // 2. 이미지 파일 및 참가자 데이터는 별도로 처리합니다.
-    const imageFiles = formData.getAll("images") as File[];
+   
     
 
 
 	try {
-    const imageUrls = await uploadImages(imageFiles);
+   
 		// 3. 데이터베이스에 모든 정보를 한 번에 저장 (트랜잭션)
 		await db.$transaction(async prisma => {
 			// 3-1. 이벤트 생성
@@ -104,7 +107,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 					name,
 					description,
 					images: {
-            create: imageUrls.map(url => ({ url })),
+            create: imageUrls.map(url => ({ url })), // 👈 S3 URL을 바로 사용
           }, // imageUrl이 null일 수 있음
 					isAllDay,
 					startDate,
