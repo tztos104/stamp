@@ -21,9 +21,14 @@ export default [
     route("events/:id", "routes/events/$id.tsx"),
     route("claim", "routes/claim.tsx"),
     route("mypage", "routes/mypage.tsx"),
+ 
     // 추후 이 레이아웃을 사용하는 다른 페이지가 생기면 여기에 추가하면 됩니다.
     // 예: route("my-page", "routes/my-page.tsx"),s
-
+ ...prefix("forgot-password", [
+      index("routes/forgot-password/index.tsx"),
+      route("verify", "routes/forgot-password/verify.tsx"),
+      route("reset", "routes/forgot-password/reset.tsx"),
+    ]),
     
   ]),
  route("admin", "routes/admin/_layout.tsx", [

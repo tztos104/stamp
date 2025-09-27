@@ -154,6 +154,10 @@ export default function LoginPage() {
             <Link to="/signup" className="underline">
               회원가입
             </Link>
+             <span className="mx-1">·</span>
+            <Link to="/forgot-password" className="underline">
+              비밀번호 찾기
+            </Link>
           </div>
         </CardContent>
       </Card>
