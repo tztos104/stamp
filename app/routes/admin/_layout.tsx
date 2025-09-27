@@ -47,7 +47,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 // --- PC 버전 레이아웃 컴포넌트 (변경 없음) ---
 function PCLayout({ user, children }: { user: any, children: React.ReactNode }) {
-  // ... (이전과 동일)
   return (
     <div className="grid min-h-screen w-full grid-cols-[220px_1fr]">
       <div className="border-r bg-muted/40">
@@ -59,7 +58,8 @@ function PCLayout({ user, children }: { user: any, children: React.ReactNode }) 
             </Link>
           </div>
           <div className="flex-1">
-            <SidebarNav />
+            {/* 👇 PC 뷰에서는 Sheet 안에 있지 않으므로 inSheet={false} 전달 */}
+            <SidebarNav inSheet={false} />
           </div>
         </div>
       </div>
@@ -113,7 +113,7 @@ function Header({ user, currentView }: { user: any, currentView: 'pc' | 'mobile'
                 관리자 메뉴를 통해 각 항목으로 이동하세요.
               </SheetDescription>
             </SheetHeader>
-            <SidebarNav />
+            <SidebarNav inSheet={false} />
           </SheetContent>
         </Sheet>
       )}
@@ -139,34 +139,32 @@ function Header({ user, currentView }: { user: any, currentView: 'pc' | 'mobile'
 }
 
 // --- 공통 사이드바 네비게이션 (링크 수정 및 추가) ---
-function SidebarNav() {
+function SidebarNav({ inSheet }: { inSheet: boolean }) {
+  // 👇 SheetClose 또는 빈 Fragment를 반환하는 조건부 래퍼 컴포넌트
+  const NavLinkWrapper = inSheet ? SheetClose : ({ children }: { children: React.ReactNode }) => <>{children}</>;
+  
   return (
     <nav className="grid items-start px-2 text-sm font-medium lg:px-4 mt-4">
-      {/* 👇 각 Link를 SheetClose로 감싸줍니다. asChild prop이 핵심입니다. */}
-      <SheetClose asChild>
+      <NavLinkWrapper asChild>
         <Link to="/admin" className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
           <Home className="h-4 w-4" /> 대시보드
         </Link>
-      </SheetClose>
-      <SheetClose asChild>
-       <Link
-          to="/admin/events"
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
-        >
-          <Package className="h-4 w-4" />
-          이벤트 관리
+      </NavLinkWrapper>
+      <NavLinkWrapper asChild>
+        <Link to="/admin/events" className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
+          <Package className="h-4 w-4" /> 이벤트 관리
         </Link>
-      </SheetClose>
-      <SheetClose asChild>
+      </NavLinkWrapper>
+      <NavLinkWrapper asChild>
         <Link to="/admin/users" className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
           <Users className="h-4 w-4" /> 회원 관리
         </Link>
-      </SheetClose>
-      <SheetClose asChild>
+      </NavLinkWrapper>
+      <NavLinkWrapper asChild>
         <Link to="/admin/coupons" className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
           <Ticket className="h-4 w-4" /> 쿠폰 관리
         </Link>
-      </SheetClose>
+      </NavLinkWrapper>
     </nav>
   );
 }
