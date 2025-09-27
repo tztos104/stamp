@@ -16,8 +16,9 @@ import {
 import { Button } from "~/components/ui/button";
 import { Toaster } from "~/components/ui/sonner";
 import { toast } from "sonner";
-import { commitSession, getFlashSession } from "~/lib/session.server";
+import {  commitSession, getFlashSession } from "~/lib/session.server";
 import { useEffect } from "react";
+import { json } from "@remix-run/node";
 
 type LoaderData = {
   toastMessage: {
@@ -34,15 +35,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const view = url.searchParams.get("view") === "pc" ? "pc" : "mobile";
   const flashSession = await getFlashSession(request.headers.get("Cookie"));
   const toastMessage = flashSession.get("toast") || null;
- 
+  flashSession.unset("toast");
 
-
-  return {user,view, toastMessage,
+ const data = { user, view, toastMessage };
+  return json(data, {
     headers: {
-      "Content-Type": "application/json",
       "Set-Cookie": await commitSession(flashSession),
     },
-  };
+  });
 };
 
 // --- PC 버전 레이아웃 컴포넌트 (변경 없음) ---

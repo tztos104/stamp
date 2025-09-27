@@ -1,13 +1,14 @@
 // app/routes/admin/events/$eventId.edit.tsx
 
-import { json,} from "@remix-run/node";
+
 import { useLoaderData, useFetcher, type LoaderFunctionArgs, type ActionFunctionArgs, redirect  } from "react-router";
 import { db } from "~/lib/db.server";
-import { EventForm } from "../../../../components/eventform"; // 👈 재사용 폼 컴포넌트
+import { EventForm } from "~/components/eventform"; // 👈 재사용 폼 컴포넌트
 import { getFlashSession, commitSession } from "~/lib/session.server";
 import { uploadImages } from "~/lib/upload.server";
-import type { Participant } from "../../../../components/participantManager";
+import type { Participant } from "~/components/participantManager";
 import * as z from 'zod';
+import dayjs from 'dayjs';
 
 // loader: URL의 eventId를 사용해 수정할 이벤트의 데이터를 불러옵니다.
 export const loader = async ({ params }: LoaderFunctionArgs) => {
@@ -97,23 +98,32 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
 export const action = async ({ request, params }: ActionFunctionArgs) => {
      const eventId = params.eventId!;
     if (!eventId) {
-        return json({ error: "이벤트 ID가 없습니다." }, { status: 400 });
+        throw new Response("이벤트가 없습니다.", { status: 400 });
     }
 
     const formData = await request.formData();
-    
+    const flashSession = await getFlashSession(request.headers.get("Cookie"));
     const result = eventFormSchema.safeParse({
         ...Object.fromEntries(formData),
         isAllDay: formData.get('isAllDay') === 'true',
-        startDate: new Date(formData.get('startDate') as string),
-        endDate: new Date(formData.get('endDate') as string),
+        startDate:  dayjs(formData.get('startDate') as string).toDate(),
+        endDate: dayjs(formData.get('endDate') as string).toDate(),
     });
 
     // 1. 유효성 검사 실패 시, 에러 메시지를 반환합니다.
     if (!result.success) {
-        const formErrors = result.error.flatten().fieldErrors;
-        return json({ error: '입력값이 올바르지 않습니다.', formErrors }, { status: 400 });
-    }
+      const error = result.error.flatten();
+    const firstErrorMessage = Object.values(error.fieldErrors).flat()[0] || error.formErrors[0] || '입력값이 올바르지 않습니다.';
+    flashSession.flash("toast", { type: "error", message: firstErrorMessage });
+    
+    return new Response(JSON.stringify({ error: firstErrorMessage }), {
+        status: 400,
+        headers: { 
+            "Content-Type": "application/json",
+            "Set-Cookie": await commitSession(flashSession)
+        },
+    });
+  }
 
     // 유효성 검사를 통과한 안전한 데이터를 사용합니다.
     const { name, description, categoryId, isAllDay, startDate, endDate } = result.data;
@@ -293,8 +303,16 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         });
     } catch (error) {
         console.error("이벤트 수정 실패:", error);
-        return json({ error: "이벤트 수정 중 오류가 발생했습니다." }, { status: 500 });
-    }
+       flashSession.flash("toast", { type: "error", message: '이벤트 등록 중 오류가 발생했습니다.' });
+    
+    return new Response(JSON.stringify({ error: '이벤트 등록 중 오류가 발생했습니다.' }), {
+        status: 500,
+        headers: { 
+            "Content-Type": "application/json",
+            "Set-Cookie": await commitSession(flashSession)
+        },
+    });
+  }
 };
 
 export default function EditEventPage() {
