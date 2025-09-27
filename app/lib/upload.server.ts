@@ -1,4 +1,4 @@
-// app/lib/upload.server.ts (스트리밍 방식으로 전면 수정)
+// app/lib/upload.server.ts (최종 수정)
 import { PassThrough } from "stream";
 import { S3Client } from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
@@ -26,9 +26,7 @@ function processImageStream() {
   return passthrough.pipe(sharpStream);
 }
 
-
 export const s3UploadHandler: UploadHandler = async ({ name, data, filename }) => {
-  // 'images' 필드에 대한 업로드만 처리합니다.
   if (name !== "images" && name !== "newImages") {
     return undefined;
   }
@@ -47,15 +45,16 @@ export const s3UploadHandler: UploadHandler = async ({ name, data, filename }) =
   });
 
   // 비동기 스트림 데이터를 파이프로 연결
-  // data는 AsyncIterable<Uint8Array> 타입입니다.
   for await (const chunk of data) {
     processedImageStream.write(chunk);
   }
   processedImageStream.end();
 
-  await upload.done();
+  // 👇 여기가 핵심 수정사항입니다!
+  // .done()을 한 번만 호출하고 결과를 변수에 저장합니다.
+  const result = await upload.done();
 
-  // 업로드된 파일의 최종 URL 반환
-  const url = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${(await upload.done()).Key}`;
+  // 저장된 결과에서 Key를 사용하여 URL을 만듭니다.
+  const url = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${result.Key}`;
   return url;
 };
