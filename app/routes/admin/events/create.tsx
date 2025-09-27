@@ -14,11 +14,12 @@ import { commitSession, getFlashSession } from '~/lib/session.server';
 import { EventForm } from "~/components/eventform";
 import type { Participant } from '~/components/participantManager';
 import dayjs from 'dayjs';
+import { json } from '@remix-run/node';
 
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
 	const categories = await db.eventCategory.findMany();
-	return { categories };
+	return json({ categories });
 };
 
 // --- 참가자와 전체 폼에 대한 Zod 스키마를 강화합니다. ---
@@ -78,12 +79,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     flashSession.flash("toast", { type: "error", message: firstErrorMessage });
     
     // 👇 json() 헬퍼 대신 new Response() 사용
-    return new Response(JSON.stringify({ error: firstErrorMessage }), {
+    return json({ error: firstErrorMessage }, {
         status: 400,
-        headers: { 
-            "Content-Type": "application/json",
-            "Set-Cookie": await commitSession(flashSession)
-        },
+        headers: { "Set-Cookie": await commitSession(flashSession) },
     });
   }
   
@@ -205,12 +203,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const flashSession = await getFlashSession(request.headers.get("Cookie"));
     flashSession.flash("toast", { type: "error", message: '이벤트 등록 중 오류가 발생했습니다.' });
     
-    return new Response(JSON.stringify({ error: '이벤트 등록 중 오류가 발생했습니다.' }), {
+    return json({ error: '이벤트 등록 중 오류가 발생했습니다.' }, {
         status: 500,
-        headers: { 
-            "Content-Type": "application/json",
-            "Set-Cookie": await commitSession(flashSession)
-        },
+        headers: { "Set-Cookie": await commitSession(flashSession) },
     });
   }
 };
