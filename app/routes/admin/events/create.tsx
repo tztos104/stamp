@@ -1,10 +1,11 @@
-import {  json, redirect} from '@remix-run/node';
+
 import {
 	type LoaderFunctionArgs,
 	useFetcher,
 	useLoaderData,
 	useRevalidator,
 	type ActionFunctionArgs,
+  redirect,
 } from 'react-router';
 import * as z from 'zod';
 import { db } from '~/lib/db.server';
@@ -12,7 +13,8 @@ import { uploadImages } from "~/lib/upload.server";
 import { commitSession, getFlashSession } from '~/lib/session.server';
 import { EventForm } from "~/components/eventform";
 import type { Participant } from '~/components/participantManager';
-
+import dayjs from 'dayjs';
+import { json } from '@remix-run/node';
 
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -20,6 +22,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 	return { categories };
 };
 
+// --- 참가자와 전체 폼에 대한 Zod 스키마를 강화합니다. ---
+const participantSchema = z.object({
+  type: z.enum(['user', 'temp-phone', 'temp-code']),
+  id: z.string(),
+  name: z.string(),
+  detail: z.string(),
+  maxUses: z.number().nullable().optional(),
+  expiryOption: z.enum(['event_end', 'one_day', 'three_days', 'custom']).optional(),
+  customExpiryDate: z.string().nullable().optional(),
+});
 // Zod 스키마 업데이트
 const eventFormSchema = z.object({
 	name: z.string().min(2, '이벤트 이름은 2글자 이상이어야 합니다.'),
@@ -33,44 +45,57 @@ const eventFormSchema = z.object({
 	endDate: z.date().refine(date => date, {
 		message: '종료 날짜를 선택해주세요.',
 	}),
-	
+	 participants: z.array(participantSchema).min(1, '참가자를 한 명 이상 등록해주세요.'),
+}).refine(data => data.endDate >= data.startDate, {
+    message: "종료일은 시작일보다 빠를 수 없습니다.",
+    path: ["endDate"],
 });
 
 
 
 export const action = async ({ request }: ActionFunctionArgs) => {
 	const formData = await request.formData();
+  
+    const participantsJSON = formData.get("participants") as string;
+    // 참가자 데이터가 비어있거나 잘못된 형식일 경우를 대비한 방어 코드
+    const participants: Participant[] = participantsJSON ? JSON.parse(participantsJSON) : [];
 
-	 // 💡 Zod 스키마로 formData를 안전하게 파싱하고 유효성을 검사합니다.
-    const result = eventFormSchema.safeParse({
-        ...Object.fromEntries(formData),
-        isAllDay: formData.get('isAllDay') === 'true',
-        startDate: new Date(formData.get('startDate') as string),
-        endDate: new Date(formData.get('endDate') as string),
-    });
+  const result = eventFormSchema.safeParse({
+    name: formData.get('name'),
+    description: formData.get('description'),
+    isAllDay: formData.get('isAllDay') === 'true',
+    categoryId: formData.get('categoryId'),
+    startDate: dayjs(formData.get('startDate') as string).toDate(),
+    endDate: dayjs(formData.get('endDate') as string).toDate(),
+    participants: participants
+  });
 
     // 1. 유효성 검사 실패 시, 에러 메시지와 함께 400 상태 코드를 반환합니다.
     if (!result.success) {
-        // Zod가 생성한 에러 메시지를 formErrors 객체로 변환
-        const formErrors = result.error.flatten().fieldErrors;
-        return json({ error: '입력값이 올바르지 않습니다.', formErrors }, { status: 400 });
-    }
+      const flashSession = await getFlashSession(request.headers.get("Cookie"));
+    const error = result.error.flatten();
+    // 가장 첫 번째 에러 메시지를 토스트로 보여줍니다.
+    const firstErrorMessage = Object.values(error.fieldErrors).flat()[0] || error.formErrors[0] || '입력값이 올바르지 않습니다.';
+    flashSession.flash("toast", { type: "error", message: firstErrorMessage });
+    
+    // 👇 json() 헬퍼 대신 new Response() 사용
+    return json({ error: firstErrorMessage }, {
+        status: 400,
+        headers: { "Set-Cookie": await commitSession(flashSession) },
+    });
+  }
+  
     
     // 유효성 검사를 통과한 안전한 데이터를 사용합니다.
     const { name, description, categoryId, isAllDay, startDate, endDate } = result.data;
 
     // 2. 이미지 파일 및 참가자 데이터는 별도로 처리합니다.
     const imageFiles = formData.getAll("images") as File[];
-    const imageUrls = await uploadImages(imageFiles);
+    
 
-    const participantsJSON = formData.get("participants") as string;
-    // 참가자 데이터가 비어있거나 잘못된 형식일 경우를 대비한 방어 코드
-    const participants: Participant[] = participantsJSON ? JSON.parse(participantsJSON) : [];
-    if (participants.length === 0) {
-        return json({ error: '참가자를 한 명 이상 등록해주세요.' }, { status: 400 });
-    }
 
 	try {
+    const imageUrls = await uploadImages(imageFiles);
 		// 3. 데이터베이스에 모든 정보를 한 번에 저장 (트랜잭션)
 		await db.$transaction(async prisma => {
 			// 3-1. 이벤트 생성
@@ -174,14 +199,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 
               });
             } catch (error) {
-            
-              console.error(error);
-              return json(
-                { error: '이벤트 등록 중 오류가 발생했습니다.' },
-                { status: 500 },
-              );
-            }
-          };
+    console.error("이벤트 등록 실패:", error);
+    const flashSession = await getFlashSession(request.headers.get("Cookie"));
+    flashSession.flash("toast", { type: "error", message: '이벤트 등록 중 오류가 발생했습니다.' });
+    
+    return json({ error: '이벤트 등록 중 오류가 발생했습니다.' }, {
+        status: 500,
+        headers: { "Set-Cookie": await commitSession(flashSession) },
+    });
+  }
+};
+
 
 export default function CreateEventPage() {
   const { categories } = useLoaderData<typeof loader>();

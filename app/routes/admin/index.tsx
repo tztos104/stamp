@@ -15,9 +15,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     totalUsers,
     totalEvents,
     totalCoupons,
-    recentUsers,
-    recentEvents,
-    recentCoupons, // 👈 최근 쿠폰 데이터 추가
+    rawRecentUsers,
+    rawRecentEvents,
+    rawRecentCoupons, // 👈 최근 쿠폰 데이터 추가
   ] = await Promise.all([
     db.user.count(),
     db.event.count(),
@@ -50,7 +50,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }
     })
   ]);
-
+ const recentUsers = rawRecentUsers.map(user => ({ ...user, createdAt: format(new Date(user.createdAt), "yy.MM.dd") }));
+  const recentEvents = rawRecentEvents.map(event => ({ ...event, createdAt: format(new Date(event.createdAt), "yy.MM.dd") }));
+  const recentCoupons = rawRecentCoupons.map(coupon => ({ ...coupon, createdAt: format(new Date(coupon.createdAt), "yy.MM.dd") }));
   return {
     totalUsers,
     totalEvents,
@@ -82,7 +84,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* 1. 핵심 지표 카드 (변경 없음) */}
-      <div className="grid gap-4 ">
+      <div className="grid gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">총 사용자</CardTitle>
@@ -138,7 +140,7 @@ export default function AdminDashboard() {
                         {user.name}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-right">{format(new Date(user.createdAt), "yy.MM.dd")}</TableCell>
+                    <TableCell className="text-right">{user.createdAt}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -147,7 +149,7 @@ export default function AdminDashboard() {
         </Card>
         
         {/* 최근 등록된 이벤트 */}
-        <Card className="lg:col-span-1">
+        <Card className="col-span-1">
           <CardHeader>
             <CardTitle>최근 등록된 이벤트</CardTitle>
           </CardHeader>
@@ -167,7 +169,7 @@ export default function AdminDashboard() {
                         {event.name}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-right">{format(new Date(event.createdAt), "yy.MM.dd")}</TableCell>
+                    <TableCell className="text-right">{event.createdAt}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -176,7 +178,7 @@ export default function AdminDashboard() {
         </Card>
 
         {/* 👇 최근 발급된 쿠폰 카드 (신규 추가) */}
-        <Card className="lg:col-span-1">
+        <Card className="col-span-1">
           <CardHeader>
             <CardTitle>최근 발급된 쿠폰</CardTitle>
           </CardHeader>
@@ -196,7 +198,7 @@ export default function AdminDashboard() {
                         {coupon.stampCard.user.name}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-right">{format(new Date(coupon.createdAt), "yy.MM.dd")}</TableCell>
+                    <TableCell className="text-right">{coupon.createdAt}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

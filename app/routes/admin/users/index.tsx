@@ -66,7 +66,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const users = rawUsers.map(user => {
     const couponCount = user.StampCard.filter(card => card.coupon !== null).length;
     const { StampCard, ...rest } = user; 
-    return { ...rest, couponCount };
+    return { 
+      ...rest, 
+      couponCount,
+      createdAtFormatted: format(new Date(user.createdAt), "yyyy.MM.dd", { locale: ko })
+    };
   });
 
   const totalPages = Math.ceil(totalUsers / USERS_PER_PAGE);
@@ -155,7 +159,7 @@ export default function AdminUsersPage() {
               <p className="text-sm text-muted-foreground mt-2">다른 검색어나 필터를 사용해보세요.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1  gap-4">
+            <div className="grid grid-cols-1 gap-4">
               {users.map((user) => (
                 <Link to={`/admin/users/${user.id}`} key={user.id} className="block">
                   <Card className="h-full hover:shadow-lg transition-shadow duration-200">
@@ -176,7 +180,7 @@ export default function AdminUsersPage() {
                       </div>
                       <div className="flex items-center text-sm text-muted-foreground">
                         <Calendar className="h-4 w-4 mr-2" />
-                        <span>가입: {format(new Date(user.createdAt), "yyyy.MM.dd", { locale: ko })}</span>
+                        <span>가입: {user.createdAtFormatted}</span>
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground pt-2 border-t mt-3">
                         <div className="flex items-center">
