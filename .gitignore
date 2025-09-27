@@ -10,3 +10,4 @@
 /build/
 secure.key
 /generated/prisma
+package-lock.json

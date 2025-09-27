@@ -35,7 +35,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const user = session.user;
   const flashSession = await getFlashSession(request.headers.get("Cookie"));
   const toastMessage = flashSession.get("toast") || null;
-
+  flashSession.unset("toast");
   const data: LoaderData = { toastMessage ,user};
 
   return new Response(JSON.stringify(data), {

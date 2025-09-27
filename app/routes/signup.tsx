@@ -27,7 +27,11 @@ import { db } from "~/lib/db.server";
 import { lucia, hashPassword } from "~/lib/auth.server";
 import { Prisma } from "@prisma/client";
 import { getFlashSession, commitSession } from "~/lib/session.server";
-
+import { Checkbox } from "~/components/ui/checkbox";
+import { Separator } from "~/components/ui/separator";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger} from "~/components/ui/dialog";
+import { TermsOfServiceContent } from "~/components/terms";
+import { PrivacyPolicyContent } from "~/components/privacy";
 
 // --- Loader 함수 (추가) ---
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -36,58 +40,56 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { claimCode };
 };
 
-
 export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
-  const name = formData.get("name") as string;
-  const phoneNumber = formData.get("phoneNumber") as string;
-  const password = formData.get("password") as string;
-  const claimCode = formData.get("claimCode") as string; // hidden input으로 넘어온 코드
-
+  const submission = {
+    name: formData.get("name"),
+    phoneNumber: formData.get("phoneNumber"),
+    password: formData.get("password"),
+    agreedToTerms: formData.get("agreedToTerms") === "true",
+    agreedToPrivacyPolicy: formData.get("agreedToPrivacyPolicy") === "true",
+    agreedToMarketing: formData.get("agreedToMarketing") === "true",
+  };
+  const claimCode = formData.get("claimCode") as string;
   const flashSession = await getFlashSession(request.headers.get("Cookie"));
 
-  // --- 폼 데이터 유효성 검증 (Zod 스키마는 클라이언트에서, 서버에서는 기본 검증) ---
-  const validationResult = formSchema.safeParse({ name, phoneNumber, password });
+  const validationResult = formSchema.safeParse(submission);
+
   if (!validationResult.success) {
-    const errorMessages = validationResult.error.issues.map(e => e.message).join(", ");
-    flashSession.flash("toast", { message: errorMessages, type: "error" });
+    // Zod 에러 메시지를 사용자에게 보여줍니다.
+    const firstError = validationResult.error.issues[0]?.message || "입력값이 올바르지 않습니다.";
+    flashSession.flash("toast", { message: firstError, type: "error" });
     return redirect(`/signup${claimCode ? `?claimCode=${claimCode}` : ''}`, {
       headers: { "Set-Cookie": await commitSession(flashSession) },
     });
   }
-
+  
+  const { name, phoneNumber, password, agreedToTerms, agreedToPrivacyPolicy, agreedToMarketing } = validationResult.data;
   const hashedPassword = hashPassword(password);
 
   try {
-   const transactionResult = await db.$transaction(async (prisma) => {
-      // 1. 기존 사용자를 전화번호로 찾습니다. (상태 무관)
-      const existingUser = await prisma.user.findUnique({
-        where: { phoneNumber },
-      });
-
+    const transactionResult = await db.$transaction(async (prisma) => {
+      const existingUser = await prisma.user.findUnique({ where: { phoneNumber } });
       let user: { id: string };
 
-      // 2. 사용자 상태에 따라 분기 처리
       if (existingUser) {
-        // 2-1. 이미 존재하는 정식 회원(ACTIVE)일 경우, 오류 처리
         if (existingUser.status === 'ACTIVE') {
-          throw new Prisma.PrismaClientKnownRequestError(
-            "이미 사용 중인 전화번호입니다.",
-            { code: 'P2002', clientVersion: '' }
-          );
+          throw new Prisma.PrismaClientKnownRequestError("이미 사용 중인 전화번호입니다.", { code: 'P2002', clientVersion: '' });
         }
-
-        // 2-2. 임시 회원(TEMPORARY)일 경우, 정식 회원으로 전환 (UPDATE)
+        
         user = await prisma.user.update({
           where: { id: existingUser.id },
           data: {
-            name, // 사용자가 입력한 이름으로 업데이트
+            name,
             status: 'ACTIVE',
+            // [수정] 임시 회원이 정식 전환될 때도 약관 동의 정보 업데이트
+            agreedToTerms,
+            agreedToPrivacyPolicy,
+            agreedToMarketing,
           },
           select: { id: true },
         });
 
-        // Key 테이블에 비밀번호 정보 생성
         await prisma.key.create({
           data: {
             id: `password:${phoneNumber}`,
@@ -95,14 +97,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             hashedPassword,
           },
         });
-
       } else {
-        // 2-3. 존재하지 않는 사용자일 경우, 신규 생성 (CREATE)
         user = await prisma.user.create({
           data: {
             name,
             phoneNumber,
             status: "ACTIVE",
+            // [수정] 생성 시 약관 동의 정보 저장
+            agreedToTerms,
+            agreedToPrivacyPolicy,
+            agreedToMarketing,
             keys: {
               create: {
                 id: `password:${phoneNumber}`,
@@ -181,16 +185,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return redirect(claimCode ? "/card" : "/", { headers });
 
   } catch (e: unknown) {
-    console.error("회원가입/스탬프 적립 중 오류:", e);
-
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
-      flashSession.flash("toast", { message: "이미 사용 중인 전화번호입니다.", type: "error" });
-    } else if (e instanceof Error) {
-      flashSession.flash("toast", { message: e.message, type: "error" });
-    } else {
-      flashSession.flash("toast", { message: "회원가입 중 알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", type: "error" });
-    }
-
+    const message = e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002'
+      ? "이미 사용 중인 전화번호입니다."
+      : e instanceof Error
+      ? e.message
+      : "회원가입 중 알 수 없는 오류가 발생했습니다.";
+    flashSession.flash("toast", { message, type: "error" });
     return redirect(`/signup${claimCode ? `?claimCode=${claimCode}` : ''}`, {
       headers: { "Set-Cookie": await commitSession(flashSession) },
     });
@@ -204,8 +204,51 @@ const formSchema = z.object({
     message: '전화번호 형식에 맞게 입력해주세요',
   }).transform((s) => s.replace(/\D/g, '')),
   password: z.string().min(4, { message: "비밀번호는 4자리 이상이어야 합니다." }),
+  agreedToTerms: z.boolean({
+    error: "이용약관에 동의해주세요.",
+  }).refine(val => val, {
+    message: "이용약관에 동의해주세요.",
+  }),
+
+  agreedToPrivacyPolicy: z.boolean({
+    error: "개인정보 수집 및 이용에 동의해주세요.",
+  }).refine(val => val, {
+    message: "개인정보 수집 및 이용에 동의해주세요.",
+  }),
+
+  agreedToMarketing: z.boolean().default(false).optional(),
 });
 
+function PolicyDialog({ triggerText, title, children }: { triggerText: string, title: string, children: React.ReactNode }) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        {/* '내용 보기' 텍스트를 좀 더 눈에 띄게 수정했습니다. */}
+        <Button variant="link" type="button" className="p-0 h-auto text-xs text-muted-foreground hover:text-primary">
+          {triggerText}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="text-xl">{title}</DialogTitle>
+          <DialogDescription></DialogDescription>
+        </DialogHeader>
+        {/* 스크롤 영역을 분리하여 헤더와 푸터는 고정되도록 합니다. */}
+        <div className="prose max-w-none text-sm overflow-y-auto max-h-[60vh] pr-4">
+          {children}
+        </div>
+        <DialogFooter className="pt-4 border-t">
+          {/* DialogClose를 사용하면 버튼 클릭 시 자동으로 팝업이 닫힙니다. */}
+          <DialogClose asChild>
+            <Button type="button" variant="secondary">
+              닫기
+            </Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 export default function SignupPage() {
   const { claimCode } = useLoaderData<typeof loader>(); // loader 데이터 사용
   const fetcher = useFetcher<typeof action>();
@@ -215,18 +258,31 @@ export default function SignupPage() {
       name: "",
       phoneNumber: "",
       password: "",
+      agreedToTerms: false, agreedToPrivacyPolicy: false, agreedToMarketing: false 
     },
   });
+
+    const handleAllAgreementChange = (checked: boolean | 'indeterminate') => {
+    const isChecked = checked === true;
+    form.setValue("agreedToTerms", isChecked);
+    form.setValue("agreedToPrivacyPolicy", isChecked);
+    form.setValue("agreedToMarketing", isChecked);
+  };
+
+   const isAllAgreed = form.watch("agreedToTerms") && form.watch("agreedToPrivacyPolicy") && form.watch("agreedToMarketing");
+   const isSomeAgreed = (form.watch("agreedToTerms") || form.watch("agreedToPrivacyPolicy") || form.watch("agreedToMarketing")) && !isAllAgreed;
 
   // fetcher.data?.error 처리 제거 (toast로 통일)
   // fetcher.state를 이용한 disabled 상태는 유지
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    // claimCode가 있다면 폼 데이터에 추가
+   function onSubmit(values: z.infer<typeof formSchema>) {
     const formData = new FormData();
     formData.append("name", values.name);
     formData.append("phoneNumber", values.phoneNumber);
     formData.append("password", values.password);
+    formData.append("agreedToTerms", String(values.agreedToTerms));
+    formData.append("agreedToPrivacyPolicy", String(values.agreedToPrivacyPolicy));
+    formData.append("agreedToMarketing", String(values.agreedToMarketing || false));
     if (claimCode) {
       formData.append("claimCode", claimCode);
     }
@@ -297,12 +353,51 @@ export default function SignupPage() {
                   </FormItem>
                 )}
               />
-              <Button
-                type="submit"
-                className="w-full text-white bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 font-semibold"
-                disabled={fetcher.state !== 'idle'}
-              >
-                {fetcher.state !== 'idle' ? '가입 처리 중...' : '계정 만들기'}
+              <div className="space-y-3 rounded-md border p-4">
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="all-agree" checked={isAllAgreed} onCheckedChange={handleAllAgreementChange} />
+                    <label htmlFor="all-agree" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        전체 동의 (선택 정보 포함)
+                    </label>
+                </div>
+                 <Separator />
+                 <FormField control={form.control} name="agreedToTerms" render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between space-y-0">
+                    <div className="flex items-center space-x-2">
+                      <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                      <FormLabel className="text-sm font-normal"> [필수] 이용약관 동의 </FormLabel>
+                    </div>
+                    {/* 👇 컴포넌트로 교체 */}
+                    <PolicyDialog triggerText="내용 보기" title="이용약관">
+                      <TermsOfServiceContent />
+                    </PolicyDialog>
+                  </FormItem>
+                )} />
+
+                 <FormField control={form.control} name="agreedToPrivacyPolicy" render={({ field }) => (
+                   <FormItem className="flex flex-row items-center justify-between space-y-0">
+                    <div className="flex items-center space-x-2">
+                      <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                      <FormLabel className="text-sm font-normal"> [필수] 개인정보 수집·이용 동의 </FormLabel>
+                    </div>
+                    {/* 👇 컴포넌트로 교체 */}
+                    <PolicyDialog triggerText="내용 보기" title="개인정보 처리방침">
+                      <PrivacyPolicyContent />
+                    </PolicyDialog>
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="agreedToMarketing" render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                        <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                        <FormLabel className="text-sm font-normal">[선택] 마케팅 정보 수신 동의</FormLabel>
+                    </FormItem>
+                )} />
+                <FormMessage>{form.formState.errors.agreedToTerms?.message || form.formState.errors.agreedToPrivacyPolicy?.message}</FormMessage>
+              </div>
+
+              <Button type="submit" className="w-full" disabled={fetcher.state !== 'idle'}>
+                {fetcher.state !== 'idle' ? '가입 처리 중...' : '동의하고 가입하기'}
               </Button>
             </form>
           </Form>

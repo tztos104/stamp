@@ -28,15 +28,15 @@ model User {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
+  agreedToTerms           Boolean  @default(false)
+  agreedToPrivacyPolicy   Boolean  @default(false)
+  agreedToMarketing       Boolean  @default(false)
+
   sessions       Session[]
   keys           Key[]
   eventEntries   StampEntry[]
-
-
   StampCard StampCard[]
-
   reviews Review[]
-
   ClaimableStampRedemption ClaimableStampRedemption[]
 }
 
