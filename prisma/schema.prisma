@@ -38,6 +38,8 @@ model User {
   StampCard StampCard[]
   reviews Review[]
   ClaimableStampRedemption ClaimableStampRedemption[]
+
+  PushSubscription PushSubscription[]
 }
 
 model Session {
@@ -55,6 +57,14 @@ model Key {
   @@unique([id, userId])
 }
 
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique // 푸시 토큰은 기기마다 고유하므로 unique 속성을 부여합니다.
+  createdAt DateTime @default(now())
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
 // --- 이벤트 및 스탬프 관련 모델 ---
 
 model EventCategory {
