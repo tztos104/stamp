@@ -29,6 +29,7 @@ async function processAndUploadImage(file: File): Promise<string | null> {
 
     // sharp를 사용해 이미지를 리사이징하고 WebP 버퍼로 변환
     const optimizedBuffer = await sharp(buffer)
+      .rotate() 
       .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 80 })
       .toBuffer();
