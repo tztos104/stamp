@@ -4,7 +4,7 @@ import { type ActionFunctionArgs, type LoaderFunctionArgs, redirect } from "reac
 import { db } from "~/lib/db.server";
 import { getSession as getAuthSession } from "~/lib/auth.server"; // 기존 인증 세션
 import { getFlashSession, commitSession } from "~/lib/session.server"; // 👈 플래시 세션 임포트
-
+import { sendAlimtalk, AlimtalkType } from "~/lib/alimtalk.server";
 // --- Loader 함수 ---
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
@@ -83,7 +83,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   try {
-    const result = await db.$transaction(async (prisma) => {
+    const result = await db.$transaction(async (prisma: { claimableStamp: { findUnique: (arg0: { where: { claimCode: string; }; include: { event: boolean; redemptions: { where: { userId: string; }; }; }; }) => any; update: (arg0: { where: { id: any; }; data: { currentUses: { increment: number; }; redemptions: { create: { userId: string; }; }; }; }) => any; }; stampCard: { findFirst: (arg0: { where: { userId: string; isRedeemed: boolean; }; include: { _count: { select: { entries: boolean; }; }; }; }) => any; create: (arg0: { data: { userId: string; }; include: { _count: { select: { entries: boolean; }; }; }; }) => any; }; stampEntry: { findFirst: (arg0: { where: { stampCardId: any; eventId: any; }; }) => any; create: (arg0: { data: { userId: string; eventId: any; stampCardId: any; }; }) => any; }; }) => {
       const claimableStamp = await prisma.claimableStamp.findUnique({
         where: { claimCode },
         include: { event: true, redemptions: { where: { userId: user.id } } }, // 사용자가 이 코드를 사용했는지 확인
@@ -144,6 +144,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         },
       });
 
+      const currentStampCount = activeStampCard._count.entries + 1;
+      await sendAlimtalk(
+        AlimtalkType.STAMP_ACQUIRED,
+        user.phoneNumber, // `user` 객체에 phoneNumber가 포함되어 있어야 합니다.
+        {
+          '고객명': user.name,
+          '활동명': claimableStamp.event.name,
+          '현재개수': String(currentStampCount),
+          '남은스템프개수': String(10 - currentStampCount),
+          'link': `${process.env.APP_URL}/card`
+        }
+      );
       return activeStampCard.id;
     });
 

@@ -32,6 +32,7 @@ import { Separator } from "~/components/ui/separator";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger} from "~/components/ui/dialog";
 import { TermsOfServiceContent } from "~/components/terms";
 import { PrivacyPolicyContent } from "~/components/privacy";
+import { sendAlimtalk, AlimtalkType } from "~/lib/alimtalk.server";
 
 // --- Loader 함수 (추가) ---
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -166,6 +167,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
 
     // --- 트랜잭션 종료 ---
+    const buttonLink = `${process.env.APP_URL}`;
+
+    await sendAlimtalk(
+      AlimtalkType.WELCOME, // 회원가입 환영 템플릿 타입
+      phoneNumber,          // 수신자 전화번호
+      {
+        'link': buttonLink    // 템플릿 변수 #{link}에 들어갈 값 (고객명 없음)
+      }
+    );
 
     // 3. 회원가입 성공 시 세션 생성 및 리다이렉트
     const session = await lucia.createSession(transactionResult.id, {});
