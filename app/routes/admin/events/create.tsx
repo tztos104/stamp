@@ -187,7 +187,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             });
             // 🚨 스탬프 카드 로직 수정 끝 🚨
      const newStampCount = currentStampCount +1;
-        
+      
         // --- ▼▼▼ [추가] 스탬프 적립 성공 후 알림톡 발송 ▼▼▼ ---
         await sendAlimtalk(
           AlimtalkType.STAMP_ACQUIRED,
@@ -196,7 +196,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             '고객명': p.name,
             '활동명': newEvent.name, // 템플릿 변수에 맞게 '활동명' 사용
             '현재개수': String(newStampCount),
-            '남은스템프개수': String(10 - newStampCount),
+            '남은스탬프개수': String(10 - newStampCount),
             'link': `${process.env.APP_URL}/card`
           }
         );
