@@ -101,7 +101,7 @@ export default function AdminCouponsPage() {
                 <p className="text-sm text-muted-foreground mt-2">다른 검색어나 필터를 사용해보세요.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1  gap-4">
               {coupons.map((coupon) => (
                 <CouponCard key={coupon.id} coupon={coupon} />
               ))}

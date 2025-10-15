@@ -152,7 +152,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           '고객명': user.name,
           '활동명': claimableStamp.event.name,
           '현재개수': String(currentStampCount),
-          '남은스템프개수': String(10 - currentStampCount),
+          '남은스탬프개수': String(10 - currentStampCount),
           'link': `${process.env.APP_URL}/card`
         }
       );

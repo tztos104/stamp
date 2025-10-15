@@ -147,7 +147,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return redirect(`/admin/users/${userId}`, { headers: { "Set-Cookie": await commitSession(flashSession) }});
   }
 
-  if (intent === 'addStamp') {
+ if (intent === 'addStamp') {
     const eventId = formData.get("eventId") as string;
     if (!eventId) {
       flashSession.flash("toast", { type: "error", message: "이벤트를 선택해주세요." });
@@ -157,17 +157,16 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 let activeCard = await prisma.stampCard.findFirst({
                     where: { userId, isRedeemed: false },
                     include: { _count: { select: { entries: true } } },
-                    orderBy: { createdAt: 'asc' }
+                    orderBy: { createdAt: 'desc' } 
                 });
     
-                  if (!activeCard || activeCard._count.entries >= 10) {
-                const newCard = await prisma.stampCard.create({ data: { userId } });
-                // 👇 새로 만든 카드 객체에 _count 속성을 직접 추가하여 타입을 맞춰줍니다.
-                activeCard = {
-                    ...newCard,
-                    _count: { entries: 0 } 
-                };
-            }
+                if (!activeCard || activeCard._count.entries >= 10) {
+                    activeCard = await prisma.stampCard.create({ 
+                        data: { userId },
+                        include: { _count: { select: { entries: true } } }
+                    });
+                }
+                
                 const existingEntry = await prisma.stampEntry.findFirst({
                     where: { userId, eventId, stampCardId: activeCard.id }
                 });
@@ -218,7 +217,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 let activeCard = await prisma.stampCard.findFirst({
                     where: { userId, isRedeemed: false },
                     include: { _count: { select: { entries: true } } },
-                    orderBy: { createdAt: 'asc' }
+                     orderBy: { createdAt: 'desc' }
                 });
     
                 if (!activeCard || activeCard._count.entries >= 10) {
