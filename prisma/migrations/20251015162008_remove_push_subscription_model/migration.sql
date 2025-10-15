@@ -5,7 +5,7 @@
 
 */
 -- DropForeignKey
-ALTER TABLE `pushsubscription` DROP FOREIGN KEY `PushSubscription_userId_fkey`;
+ALTER TABLE `PushSubscription` DROP FOREIGN KEY `PushSubscription_userId_fkey`;
 
 -- DropTable
-DROP TABLE `pushsubscription`;
+DROP TABLE `PushSubscription`;
