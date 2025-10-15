@@ -15,6 +15,7 @@ import { EventForm } from "~/components/eventform";
 import type { Participant } from '~/components/participantManager';
 import dayjs from 'dayjs';
 import { json } from '@remix-run/node';
+import { sendAlimtalk, AlimtalkType } from '~/lib/alimtalk.server';
 
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -118,9 +119,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         
         
         let puserId: string;
-
+        let userPhoneNumber: string;
         if (p.type === 'user') {
           puserId = p.id;
+          userPhoneNumber = p.detail;
         } else if (p.type === 'temp-phone') {
           let user = await prisma.user.findUnique({ where: { phoneNumber: p.id } });
           if (!user) {
@@ -133,6 +135,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             });
           }
           puserId = user.id;
+          userPhoneNumber = p.id;
         } else { // 'temp-code'
           let expiresAt = new Date(eventEndDate);
           if (p.expiryOption === 'one_day') {
@@ -162,11 +165,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             });
 
             let targetCardId: number | undefined;
-
+            let currentStampCount = 0;
             // 2. 진행 중인 카드 중에서 스탬프가 10개 미만인 카드를 찾습니다.
             for (const card of userActiveCards) {
               if (card.entries.length < 10) {
                 targetCardId = card.id;
+              currentStampCount = card.entries.length;
                 break; // 찾으면 루프 종료
               }
             }
@@ -182,6 +186,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               data: { userId: puserId, eventId: newEvent.id, stampCardId: targetCardId }
             });
             // 🚨 스탬프 카드 로직 수정 끝 🚨
+     const newStampCount = currentStampCount +1;
+      
+        // --- ▼▼▼ [추가] 스탬프 적립 성공 후 알림톡 발송 ▼▼▼ ---
+        await sendAlimtalk(
+          AlimtalkType.STAMP_ACQUIRED,
+          userPhoneNumber,
+          {
+            '고객명': p.name,
+            '활동명': newEvent.name, // 템플릿 변수에 맞게 '활동명' 사용
+            '현재개수': String(newStampCount),
+            '남은스탬프개수': String(10 - newStampCount),
+            'link': `${process.env.APP_URL}/card`
+          }
+        );
         } // for 루프 끝
 
           });

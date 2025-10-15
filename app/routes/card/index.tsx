@@ -75,6 +75,7 @@ export default function MyStampCardPage() {
   const [viewingAdminNote, setViewingAdminNote] = useState<string | null>(null);
 
   const revalidator = useRevalidator();
+  const [toastShown, setToastShown] = useState(false); 
 
   useEffect(() => {
     if (viewingEventId) {
@@ -82,16 +83,25 @@ export default function MyStampCardPage() {
     }
   }, [viewingEventId]);
 
-  useEffect(() => {
-    if (issueCouponFetcher.state === 'idle' && issueCouponFetcher.data) {
+useEffect(() => {
+    // 1. 새로운 제출이 시작되면(submitting, loading), 토스트 표시 상태를 초기화합니다.
+    if (issueCouponFetcher.state !== 'idle') {
+      setToastShown(false);
+    }
+    
+    // 2. 작업이 완료되고(idle), 데이터가 있으며, 아직 토스트를 표시하지 않았을 때만 실행합니다.
+    if (issueCouponFetcher.state === 'idle' && issueCouponFetcher.data && !toastShown) {
       if (issueCouponFetcher.data.success) {
         toast.success(issueCouponFetcher.data.message || "쿠폰이 성공적으로 발급되었습니다!");
         revalidator.revalidate(); // 데이터 갱신
       } else if (issueCouponFetcher.data.error) {
         toast.error(issueCouponFetcher.data.error || "쿠폰 발급 중 오류가 발생했습니다.");
       }
+      // 3. 토스트를 표시했다고 상태를 업데이트하여, 다음 리렌더링 시에는 다시 표시되지 않도록 합니다.
+      setToastShown(true);
     }
-  }, [issueCouponFetcher.state, issueCouponFetcher.data, revalidator]);
+  }, [issueCouponFetcher.state, issueCouponFetcher.data, revalidator, toastShown]);
+  
   
   const handleStampClick = (data: string | { adminNote: string | null }) => {
     if (typeof data === 'string') {

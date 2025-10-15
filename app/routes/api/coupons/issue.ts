@@ -4,7 +4,8 @@ import { type ActionFunctionArgs } from "react-router"; // 👈 react-router에�
 import { db } from "~/lib/db.server";
 import { getSession } from "~/lib/auth.server";
 import { customAlphabet } from 'nanoid';
-
+import { sendAlimtalk, AlimtalkType } from '~/lib/alimtalk.server';
+import { format } from "date-fns";
 const STAMPS_PER_CARD = 10;
 
 const nanoid = customAlphabet('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 12);
@@ -57,7 +58,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
         return coupon;
       });
-
+ await sendAlimtalk(
+        AlimtalkType.COUPON_ISSUED,
+        user.phoneNumber,
+        {
+          '고객명': user.name,
+          '쿠폰설명': newCoupon.description,
+          '만료일자': format(expiresAt, "yyyy-MM-dd"),
+          'link': `${process.env.APP_URL}/card`
+        }
+      );
       // 성공 시, 순수 객체 반환
       return { success: true, coupon: newCoupon };
 

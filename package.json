@@ -7,8 +7,8 @@
     "dev": "react-router dev",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
-    "migrate:dev": "dotenv -e .env.development -- prisma migrate dev",
-    "generate:dev": "dotenv -e .env.development -- prisma generate"
+    "migrate:dev": "dotenv -e .env.development -- npx prisma migrate dev",
+    "generate:dev": "dotenv -e .env.development --npx prisma generate"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
