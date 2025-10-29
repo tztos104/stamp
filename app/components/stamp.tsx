@@ -26,7 +26,7 @@ export function Stamp({
     >
       <Icon className={`h-10 w-10 ${color}`} strokeWidth={2} />
       {children && <div className="text-xs font-semibold mt-1">{children}</div>}
-      <Sparkles className="absolute top-1 right-1 h-4 w-4 text-white/80" /> {/* 빛나는 효과는 유지 */}
+      <Sparkles className="absolute top-1 right-1 h-2 w-2 text-white/80" /> {/* 빛나는 효과는 유지 */}
     </div>
   );
 }

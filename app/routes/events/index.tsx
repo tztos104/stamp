@@ -38,6 +38,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const endDate = url.searchParams.get("endDate");
   const sortBy = url.searchParams.get("sortBy") || "latest";
 
+  const filterMyEvents = user.role === 'USER' || myEvents;
   // 👇 orderBy는 기본 정렬(최신순)만 사용합니다.
   const orderBy: Prisma.EventOrderByWithRelationInput = { createdAt: 'desc' };
 
@@ -45,7 +46,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     AND: [
       q ? { OR: [{ name: { contains: q } }, { description: { contains: q } }] } : {},
       categoryId && categoryId !== 'all' ? { categoryId: Number(categoryId) } : {},
-      myEvents ? { participants: { some: { userId: user.id } } } : {},
+      filterMyEvents ? { participants: { some: { userId: user.id } } } : {},
       startDate ? { endDate: { gte: new Date(startDate) } } : {},
       endDate ? { startDate: { lte: new Date(endDate) } } : {},
     ],
@@ -91,13 +92,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const totalPages = Math.ceil(totalEvents / EVENTS_PER_PAGE);
 
-  return { events: paginatedEvents, totalEvents, categories, page, totalPages, q, categoryId, myEvents, startDate, endDate, sortBy };
+  return { events: paginatedEvents, totalEvents, categories, page, totalPages, q, categoryId, myEvents, startDate, endDate, sortBy, userRole: user.role };
 };
 
 
 // --- UI 컴포넌트 (변경 없음) ---
 export default function EventsIndexPage() {
-  const { events, categories, page, totalPages, q, categoryId, myEvents, startDate: initialStartDate, endDate: initialEndDate, sortBy } = useLoaderData<typeof loader>();
+  const { events, categories, page, totalPages, q, categoryId, myEvents, startDate: initialStartDate, endDate: initialEndDate, sortBy, userRole } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
   const [isSearchVisible, setIsSearchVisible] = useState(!!q || !!categoryId || myEvents || !!initialStartDate || !!initialEndDate || sortBy !== 'latest');
   
@@ -165,10 +166,15 @@ export default function EventsIndexPage() {
             </div>
             
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox id="my-events" name="myEvents" defaultChecked={myEvents} />
-                <Label htmlFor="my-events" className="cursor-pointer">내가 참여한 이벤트만 보기</Label>
-              </div>
+              {userRole !== 'USER' ? (
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="my-events" name="myEvents" defaultChecked={myEvents} />
+                  <Label htmlFor="my-events" className="cursor-pointer">내가 참여한 이벤트만 보기</Label>
+                </div>
+              ) : (
+                // 'USER' 역할일 때는 공간을 차지하지 않도록 빈 div를 둡니다.
+                <div></div>
+              )}
               <Button type="submit" className="w-full sm:w-auto"><Search className="h-4 w-4 mr-2" /> 검색</Button>
             </div>
           </Form>

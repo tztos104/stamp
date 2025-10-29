@@ -21,13 +21,14 @@ import {
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
 import { db } from "~/lib/db.server";
-import { getSessionId, lucia, verifyPassword } from "~/lib/auth.server"; 
+import { getSession, lucia, verifyPassword } from "~/lib/auth.server"; 
 import type { LoaderFunctionArgs } from "@remix-run/node";
 
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const session  = await getSessionId(request);
-  if (session) {
+  const session  = await getSession(request);
+  const user = session.user
+  if (user) {
     return redirect("/");
   }
   return null;

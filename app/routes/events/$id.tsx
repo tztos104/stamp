@@ -7,7 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
-import { Calendar, Users, Star, Send, Edit, Trash2 } from "lucide-react";
+import { Calendar, Users, Star, Send, Edit, Trash2, ChevronDown } from "lucide-react";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "~/components/ui/carousel";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Textarea } from "~/components/ui/textarea";
@@ -37,6 +37,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       images: true,
       category: true,
       reviews: { include: { user: { select: { id: true, name: true } } }, orderBy: { createdAt: 'desc' } },
+      participants: {
+        select: {
+          user: {
+            select: { id: true, name: true, status: true } // 이름과 상태를 가져옵니다.
+          }
+        },
+        orderBy: { user: { name: 'asc' } } // 가나다순으로 정렬
+      },
       _count: { select: { participants: true, claimableStamps: true } }
     },
   });
@@ -72,12 +80,13 @@ export default function EventDetailPage() {
   const startDate = new Date(event.startDate);
   const endDate = new Date(event.endDate);
   const duration = intervalToDuration({ start: startDate, end: endDate });
+const [showParticipants, setShowParticipants] = useState(false); 
   let durationString = Object.entries(duration)
     .filter(([unit, value]) => value > 0 && ['years', 'months', 'days', 'hours', 'minutes'].includes(unit))
     .map(([unit, value]) => `${value}${ {years: '년', months: '개월', days: '일', hours: '시간', minutes: '분'}[unit] }`)
     .join(' ');
   durationString = durationString ? `총 ${durationString} 진행` : '';
-
+const confirmedParticipants = event.participants.map(p => p.user);
   return (
      <>
     <div className="container mx-auto max-w-4xl py-3 space-y-6">
@@ -125,11 +134,46 @@ export default function EventDetailPage() {
                     <span className="ml-6 text-muted-foreground text-xs">{durationString}</span>
                 </div>
             )}
-            <div className="flex items-center">
-              <Users className="h-4 w-4 mr-2 text-[#4FC3F7]" /> {/* Users 아이콘 색상 변경 */}
-              <strong>총 참가자:</strong>
-              <span className="ml-2">{totalParticipants}명</span>
-            </div>
+          <div>
+                <button 
+                  className="flex items-center w-full text-left hover:bg-muted/50 p-1 rounded-md transition-colors"
+                  onClick={() => setShowParticipants(!showParticipants)} // 클릭 시 상태를 토글
+                >
+                  <Users className="h-4 w-4 mr-2 text-[#4FC3F7]" />
+                  <strong>총 참가자:</strong>
+                  <span className="ml-2">{totalParticipants}명</span>
+                  {/* 화살표 아이콘이 열림/닫힘 상태에 따라 회전하도록 스타일 추가 */}
+                  <ChevronDown 
+                    className={`h-4 w-4 ml-auto text-muted-foreground transition-transform duration-200 ${showParticipants ? 'rotate-180' : ''}`} 
+                  />
+                </button>
+
+                {/* showParticipants 상태가 true일 때만 아래 내용이 보입니다. */}
+                {showParticipants && (
+                  <div className="mt-2 pl-4 border-l-2 ml-3">
+                    <ul className="space-y-3 pt-2">
+                      {confirmedParticipants.map(participant => (
+                        <li key={participant.id} className="flex items-center gap-2">
+                           <Avatar className="h-6 w-6">
+                            <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${participant.name}`} />
+                            <AvatarFallback>{participant.name.slice(0, 1)}</AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium text-sm">{participant.name}</span>
+                          {participant.status === 'TEMPORARY' && <Badge variant="outline">임시</Badge>}
+                        </li>
+                      ))}
+                      {event._count.claimableStamps > 0 && (
+                        <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                          - 그 외 임시 코드 발급 {event._count.claimableStamps}명
+                        </li>
+                      )}
+                      {totalParticipants === 0 && (
+                        <li className="text-sm text-muted-foreground">아직 등록된 참가자가 없습니다.</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+              </div>
           </div>
         </CardContent>
       </Card>
