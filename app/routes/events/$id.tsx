@@ -75,7 +75,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 // ----------------------------------------------------
 export default function EventDetailPage() {
   const { event, isParticipant, hasReviewed, currentUserId } = useLoaderData<typeof loader>();
-  const totalParticipants = event._count.participants + event._count.claimableStamps;
+  const totalParticipants = event._count.participants ;
   const [viewingImage, setViewingImage] = useState<string | null>(null);
   const startDate = new Date(event.startDate);
   const endDate = new Date(event.endDate);
@@ -162,11 +162,7 @@ const confirmedParticipants = event.participants.map(p => p.user);
                           {participant.status === 'TEMPORARY' && <Badge variant="outline">임시</Badge>}
                         </li>
                       ))}
-                      {event._count.claimableStamps > 0 && (
-                        <li className="flex items-center gap-2 text-sm text-muted-foreground">
-                          - 그 외 임시 코드 발급 {event._count.claimableStamps}명
-                        </li>
-                      )}
+                      
                       {totalParticipants === 0 && (
                         <li className="text-sm text-muted-foreground">아직 등록된 참가자가 없습니다.</li>
                       )}

@@ -260,17 +260,18 @@ useEffect(() => {
             </DialogHeader>
           ) : (
             <>
-              {/* 이미지를 DialogHeader 바깥으로 이동 */}
-              {fetcher.data.event.images && fetcher.data.event.images.length > 0 && (
-                <img src={fetcher.data.event.images[0].url} alt={fetcher.data.event.name} className="w-full h-48 object-cover rounded-md mb-4" />
-              )}
+             
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold text-gray-800">{fetcher.data.event.name}</DialogTitle>
-                <DialogDescription className="text-sm text-gray-600 pt-2">
+   {fetcher.data.event.images && fetcher.data.event.images.length > 0 && (
+                <img src={fetcher.data.event.images[0].url} alt={fetcher.data.event.name} className="w-full h-48 object-cover rounded-md mb-4" />
+              )}
+                <DialogDescription className="text-sm text-gray-600 pt-2 whitespace-pre-wrap text-left">
                   {fetcher.data.event.description || "이벤트 설명이 없습니다."}
                 </DialogDescription>
               </DialogHeader>
-              
+               {/* 이미지를 DialogHeader 바깥으로 이동 */}
+           
               {/* Badge와 Rating 정보를 DialogHeader와 DialogDescription 사이에 위치 */}
               <div className="flex justify-between items-center mt-4"> {/* 여백 추가 */}
                 <Badge variant="outline" className="w-fit border-[#81C784] text-[#81C784]">
@@ -292,7 +293,7 @@ useEffect(() => {
                 </div>
                 <div className="flex items-center">
                   <Users className="h-4 w-4 mr-2 text-[#4FC3F7]" />
-                  총 {fetcher.data.event._count.participants + fetcher.data.event._count.claimableStamps}명 참여
+                  총 {fetcher.data.event._count.participants}명 참여
                 </div>
               </div>
               <DialogFooter className="mt-4">

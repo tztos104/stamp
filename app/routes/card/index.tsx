@@ -339,7 +339,7 @@ useEffect(() => {
                 </div>
                 <div className="flex items-center">
                   <Users className="h-4 w-4 mr-2 text-[#4FC3F7]" />
-                  총 {fetcher.data.event._count.participants + fetcher.data.event._count.claimableStamps}명 참여
+                  총 {fetcher.data.event._count.participants }명 참여
                 </div>
               </div>
               <DialogFooter className="mt-4">
