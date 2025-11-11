@@ -18,13 +18,13 @@ export enum AlimtalkType {
   STAMP_ACQUIRED = 1,
   /** 쿠폰 발급 안내 */
   COUPON_ISSUED = 2,
-   PASSWORD_RESET = 3,
+  PASSWORD_RESET = 3,
 }
 
 // 각 알림톡 타입에 필요한 변수들을 TypeScript로 정의하여 실수를 방지합니다.
 type AlimtalkPayloads = {
   [AlimtalkType.WELCOME]: { 'link': string };
-  [AlimtalkType.STAMP_ACQUIRED]: { '고객명': string; '활동명': string; '현재개수': string; '남은스탬프개수': string; 'link': string };
+  [AlimtalkType.STAMP_ACQUIRED]: { '활동명': string; '고객명': string; '현재개수': string; '남은스탬프개수': string; 'link': string };
   [AlimtalkType.COUPON_ISSUED]: { '고객명': string; '쿠폰설명': string; '만료일자': string; 'link': string };
   [AlimtalkType.PASSWORD_RESET]: { '인증번호': string };
 };
@@ -40,7 +40,7 @@ function getTemplateCode(type: AlimtalkType): string {
       return 'STAMP_EARNED'; // 👈 실제 카카오에 등록한 코드로 변경
     case AlimtalkType.COUPON_ISSUED:
       return 'COUPON_ISSUED'; // 👈 실제 카카오에 등록한 코드로 변경
-       case AlimtalkType.PASSWORD_RESET:
+    case AlimtalkType.PASSWORD_RESET:
       return 'AUTH_PASSWORD';
     default:
       throw new Error(`Unhandled Alimtalk type: ${type}`);
