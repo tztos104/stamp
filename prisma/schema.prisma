@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
-   previewFeatures = ["relationJoins"]
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -28,17 +28,16 @@ model User {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  agreedToTerms           Boolean  @default(false)
-  agreedToPrivacyPolicy   Boolean  @default(false)
-  agreedToMarketing       Boolean  @default(false)
+  agreedToTerms         Boolean @default(false)
+  agreedToPrivacyPolicy Boolean @default(false)
+  agreedToMarketing     Boolean @default(false)
 
-  sessions       Session[]
-  keys           Key[]
-  eventEntries   StampEntry[]
-  StampCard StampCard[]
-  reviews Review[]
+  sessions                 Session[]
+  keys                     Key[]
+  eventEntries             StampEntry[]
+  StampCard                StampCard[]
+  reviews                  Review[]
   ClaimableStampRedemption ClaimableStampRedemption[]
-
 }
 
 model Session {
@@ -53,9 +52,9 @@ model Key {
   userId         String
   hashedPassword String?
   user           User    @relation(references: [id], fields: [userId], onDelete: Cascade)
+
   @@unique([id, userId])
 }
-
 
 // --- 이벤트 및 스탬프 관련 모델 ---
 
@@ -66,21 +65,21 @@ model EventCategory {
 }
 
 model Event {
-  id            String   @id @default(cuid())
-  name          String
-  description   String?
-  imageUrl      String?
-  isAllDay      Boolean   @default(true)
-  startDate     DateTime
-  endDate       DateTime
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  categoryId    Int
-  category      EventCategory @relation(fields: [categoryId], references: [id])
-  participants  StampEntry[]
+  id              String           @id @default(cuid())
+  name            String
+  description     String?
+  imageUrl        String?
+  isAllDay        Boolean          @default(true)
+  startDate       DateTime
+  endDate         DateTime
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  categoryId      Int
+  category        EventCategory    @relation(fields: [categoryId], references: [id])
+  participants    StampEntry[]
   claimableStamps ClaimableStamp[] // 이 이벤트에 연결된 임시 코드 스탬프들
 
-  images        EventImage[]
+  images EventImage[]
 
   reviews Review[]
 }
@@ -91,18 +90,19 @@ model EventImage {
   eventId String
   event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
 }
+
 model StampEntry {
-  id          Int      @id @default(autoincrement())
-  createdAt   DateTime @default(now())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  eventId     String?
-  event       Event?   @relation(fields: [eventId], references: [id])
-  adminNote   String?
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  eventId   String?
+  event     Event?   @relation(fields: [eventId], references: [id])
+  adminNote String?
 
   stampCardId Int
   stampCard   StampCard @relation(fields: [stampCardId], references: [id])
-  isViewed    Boolean  @default(false)
+  isViewed    Boolean   @default(false)
 }
 
 model StampCard {
@@ -112,48 +112,49 @@ model StampCard {
   entries    StampEntry[]
   coupon     Coupon?
 
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 }
+
 // --- 리워드 및 임시 코드 관련 모델 ---
 
 model Coupon {
-  id          String   @id @default(cuid())
-  code        String   @unique
+  id          String    @id @default(cuid())
+  code        String    @unique
   description String
-  isUsed      Boolean  @default(false)
+  isUsed      Boolean   @default(false)
   expiresAt   DateTime
-  createdAt   DateTime @default(now())
-  stampCardId Int      @unique
+  createdAt   DateTime  @default(now())
+  stampCardId Int       @unique
   stampCard   StampCard @relation(fields: [stampCardId], references: [id])
 }
 
 // 👈 전화번호 모를 때를 위한 '주인 없는 스탬프' 모델
 model ClaimableStamp {
-  id               String    @id @default(cuid())
-  claimCode        String    @unique
-  eventId          String
-  event            Event     @relation(fields: [eventId], references: [id])
-  expiresAt        DateTime
-  createdAt        DateTime  @default(now())
+  id          String   @id @default(cuid())
+  claimCode   String   @unique
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id])
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
   // 👇 확장성을 위해 이 필드들을 추가합니다.
-  maxUses          Int?      @default(1)// 최대 사용 횟수 (null: 무제한, 1: 1회용)
-  currentUses      Int       @default(0) // 현재 사용 횟수
+  maxUses     Int?     @default(1) // 최대 사용 횟수 (null: 무제한, 1: 1회용)
+  currentUses Int      @default(0) // 현재 사용 횟수
 
   // 👇 사용 기록을 위한 관계를 추가합니다.
-  redemptions      ClaimableStampRedemption[]
+  redemptions ClaimableStampRedemption[]
 }
 
 // 👇 이 모델을 파일 하단에 새로 추가해주세요.
 model ClaimableStampRedemption {
-  id               Int      @id @default(autoincrement())
-  redeemedAt       DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  redeemedAt DateTime @default(now())
 
   claimableStampId String
   claimableStamp   ClaimableStamp @relation(fields: [claimableStampId], references: [id])
 
-  userId           String
-  user             User     @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
   // 한 사용자는 같은 코드를 한 번만 사용할 수 있습니다.
   @@unique([claimableStampId, userId])
@@ -161,7 +162,7 @@ model ClaimableStampRedemption {
 
 model Review {
   id        Int      @id @default(autoincrement())
-  rating    Int      // 별점 (1~5)
+  rating    Int // 별점 (1~5)
   comment   String?  @db.Text // 리뷰 내용 (최대 글자 수를 늘리기 위해 @db.Text 사용)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -176,4 +177,18 @@ model Review {
   // --- 규칙 설정 ---
   // 한 명의 유저는 하나의 이벤트에 대해 리뷰를 한 번만 작성할 수 있습니다.
   @@unique([userId, eventId])
+}
+
+model GameSession {
+  id    String @id @default(uuid())
+  char1 String @default("")
+  char2 String @default("")
+  char3 String @default("")
+
+  // 자리 선점 여부 (true면 누가 들어와 있음)
+  isTaken1 Boolean @default(false)
+  isTaken2 Boolean @default(false)
+  isTaken3 Boolean @default(false)
+
+  updatedAt DateTime @updatedAt
 }
