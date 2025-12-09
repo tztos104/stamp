@@ -64,4 +64,6 @@ export default [
   route("api/events/:id", "routes/api/events/$id.ts"),
   route("api/stamps/view", "routes/api/stamps/view.ts"),
   route("api/coupons/issue", "routes/api/coupons/issue.ts"),
+  route("api/available-dates", "routes/api/available-dates.ts"),
+  route("shared-dates", "routes/shared-dates.tsx"),
 ] satisfies RouteConfig;
