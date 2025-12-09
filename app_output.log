@@ -1,0 +1,7 @@
+
+> stamp@ start /app
+> react-router-serve ./build/server/index.js
+
+[react-router-serve] http://localhost:3000 (http://192.168.0.2:3000)
+GET /shared-dates 200 - - 67.860 ms
+GET /api/available-dates 401 - - 17.172 ms

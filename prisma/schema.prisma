@@ -38,6 +38,7 @@ model User {
   StampCard                StampCard[]
   reviews                  Review[]
   ClaimableStampRedemption ClaimableStampRedemption[]
+  availableDates           AvailableDate[]
 }
 
 model Session {
@@ -191,4 +192,13 @@ model GameSession {
   isTaken3 Boolean @default(false)
 
   updatedAt DateTime @updatedAt
+}
+
+model AvailableDate {
+  id     String   @id @default(cuid())
+  date   DateTime @db.Date
+  userId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
 }
