@@ -1,55 +1,57 @@
-# .github/workflows/dev.yml
-
-name: Deploy to Development Server
-
-# 'develop' 브랜치에 push 이벤트가 발생했을 때 이 워크플로우를 실행합니다.
+name: Deploy to Dev-Server (LXC 220)
 on:
   push:
-    branches: [ "develop" ]
+    branches: ["develop"]
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest # 워크플로우를 실행할 가상 환경
+    # 🏷️ 220번 서버(개발)에서 실행
+    runs-on: [self-hosted, dev-server]
+
+    strategy:
+      matrix:
+        node-version: [22.x]
 
     steps:
-    # 1. GitHub 저장소의 코드를 가상 환경으로 가져옵니다.
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "pnpm"
 
-    # 2. Docker Hub에 로그인합니다. (GitHub Secrets 사용)
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
 
-    # 3. Docker 이미지를 빌드하고 Docker Hub에 푸시합니다.
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: true
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:dev # 'dev' 태그로 이미지 식별
+      # 🔐 1. 키 파일 생성
+      - name: Create Secure Key
+        run: echo "${{ secrets.SECURE_KEY_CONTENT }}" > secure.key
 
-    # 4. SSH를 통해 개발 서버에 접속하여 배포 스크립트를 실행합니다.
-    - name: Deploy to server
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.DEV_HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.SSH_KEY }}
-        script: |
-          
-          docker system prune -a -f
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:dev
-          docker stop stamp-app-dev || true
-          docker rm stamp-app-dev || true
-          
-          docker run -d --name stamp-app-dev \
-            -p 3001:3000 \
-            -e SECURE_KEY_CONTENT='${{ secrets.SECURE_KEY_CONTENT }}' \
-            -e APP_ENV='development' \
-            ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:dev
-            
-       
-   
+      # 🔐 2. 환경변수 복호화
+      - name: Decrypt Env
+        run: node scripts/crypt.mjs decrypt
+
+      # 🔄 3. 개발용 설정 적용
+      - name: Apply Dev Env
+        run: mv .env.staging .env
+
+      - name: Generate Prisma Client
+        run: pnpm prisma generate
+
+      # 🌟 4. DB 마이그레이션
+      - name: DB Migration
+        run: pnpm prisma migrate deploy
+
+      # 🌱 5. DB 시딩 - ⭐ 추가된 부분!
+      - name: DB Seed
+        run: pnpm prisma db seed
+
+      - name: Build
+        run: pnpm build
+
+      - name: PM2 Reload (Development)
+        run: |
+          pm2 reload ecosystem.config.cjs --env development || pm2 start ecosystem.config.cjs --env development
+          pm2 save
