@@ -53,5 +53,6 @@ jobs:
 
       - name: PM2 Reload (Development)
         run: |
+          npm install -g pm2
           pm2 reload ecosystem.config.cjs --env development || pm2 start ecosystem.config.cjs --env development
           pm2 save
