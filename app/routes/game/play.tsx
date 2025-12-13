@@ -425,7 +425,7 @@ export default function GamePlayPage() {
                         <Input
                             type="text"
                             value={myChar}
-                            onChange={(e) => setMyChar(e.target.value.slice(-1))}
+                            onChange={(e) => setMyChar(e.target.value)}
                             className={`
         w-full h-full text-center font-black border-4 rounded-[2.5rem] shadow-2xl caret-transparent p-0 leading-none
         text-[140px] 
@@ -436,12 +436,8 @@ export default function GamePlayPage() {
                                 }
     `}
                             // 🚨 [수정] 모바일 키보드 오류 방지를 위한 필수 속성들
-                            autoComplete="off"   // 자동완성 끄기
-                            autoCorrect="off"    // 자동수정 끄기 (핵심)
-                            spellCheck="false"   // 맞춤법 검사 끄기
-                            autoCapitalize="off" // 자동대문자 끄기
 
-                            // maxLength={1} <-- 이건 지우신 그대로 유지하세요!
+                            maxLength={1}
                             autoFocus
                             placeholder="?"
                         />
