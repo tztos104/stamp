@@ -1,48 +1,55 @@
-# .github/workflows/deploy-main.yml
-
-name: Deploy to Production Server
-
-# 'main' 브랜치에 push 이벤트가 발생했을 때 이 워크플로우를 실행합니다.
+name: Deploy to Web-Prod (LXC 210)
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # 🏷️ 210번 서버(운영)에서 실행
+    runs-on: [self-hosted, web-prod]
+
+    strategy:
+      matrix:
+        node-version: [22.x]
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "pnpm"
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      # 🔐 1. 키 파일 생성
+      - name: Create Secure Key
+        run: echo "${{ secrets.SECURE_KEY_CONTENT }}" > secure.key
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: true
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:latest 
+      # 🔐 2. 환경변수 복호화
+      - name: Decrypt Env
+        run: node scripts/crypt.mjs decrypt
 
-    - name: Deploy to server
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.MAIN_HOST }}
-        username: ${{ secrets.USERNAME }}
-        key: ${{ secrets.SSH_KEY }}
-        script: |
-        
-          docker system prune -a -f
-          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:latest
-          docker stop stamp-app-main || true
-          docker rm stamp-app-main || true
-          
-          docker run -d --name stamp-app-main \
-            -p 3000:3000 \
-            -e SECURE_KEY_CONTENT='${{ secrets.SECURE_KEY_CONTENT }}' \
-            -e APP_ENV='production' \
-            ${{ secrets.DOCKERHUB_USERNAME }}/stamp-app:latest
+      # 3. 운영 환경 파일 확인 (필요시 이름 변경 로직 추가 가능)
+
+      - name: Generate Prisma Client
+        run: pnpm prisma generate
+
+      # 🌟 4. DB 마이그레이션 (테이블 생성/수정)
+      - name: DB Migration
+        run: pnpm prisma migrate deploy
+
+      # 🌱 5. DB 시딩 (초기 데이터 주입) - ⭐ 추가된 부분!
+      # package.json에 설정된 "prisma": {"seed": ...} 명령어를 실행합니다.
+      - name: DB Seed
+        run: pnpm prisma db seed
+
+      - name: Build
+        run: pnpm build
+
+      - name: PM2 Reload (Production)
+        run: |
+          pm2 reload ecosystem.config.cjs --env production || pm2 start ecosystem.config.cjs --env production
+          pm2 save
