@@ -346,8 +346,8 @@ function SecretCard({ char, label, color, iconColor, isRevealed, isClaimed, clai
                         <CheckCircle2 className={`w-10 h-10 md:w-16 md:h-16 ${iconColor} animate-pulse`} />
                     ) : (
                         isClaimed ? (
-                            <span className="text-xs md:text-sm text-slate-400 font-medium">
-                                {claimerName ? `${claimerName.slice(0, 1)}**` : '...'}
+                            <span className="text-2xl md:text-2xl text-slate-400 font-medium">
+                                {claimerName ? claimerName : '...'}
                             </span>
                         ) : (
                             <HelpCircle className="w-8 h-8 md:w-12 md:h-12 text-slate-600 opacity-20" />

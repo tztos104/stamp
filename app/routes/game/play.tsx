@@ -3,12 +3,12 @@
 import { type ActionFunctionArgs, type LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useFetcher, useRevalidator } from "react-router";
 import { db } from "~/lib/db.server";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Badge } from "~/components/ui/badge";
-import { Save, RefreshCcw, ArrowLeft, Users } from "lucide-react";
+import { Save, RefreshCcw, ArrowLeft, Users, Edit } from "lucide-react";
 import * as z from 'zod';
 
 const generateAnonId = () => {
@@ -17,7 +17,7 @@ const generateAnonId = () => {
 }
 
 // ------------------------------------------------------------------
-// 1. 타입 정의
+// 1. 타입 및 초기 상태 정의
 // ------------------------------------------------------------------
 type GameEntry = {
     position: number;
@@ -57,7 +57,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     if (!session) {
         session = await db.gameSession.create({
-            data: { id: sessionId, gameState: initialGameState as any, isRevealed: false }
+            data: {
+                id: sessionId,
+                gameState: initialGameState as any,
+                isRevealed: false
+            }
         });
     }
 
@@ -71,7 +75,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 // ------------------------------------------------------------------
-// 3. ACTION
+// 3. ACTION (뺏기 방지 로직 복구)
 // ------------------------------------------------------------------
 const actionSchema = z.object({
     intent: z.enum(["occupy", "input", "release"]),
@@ -90,7 +94,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const result = actionSchema.safeParse(Object.fromEntries(formData));
 
-    if (!result.success) return { error: "잘못된 요청입니다." };
+    if (!result.success) {
+        return { error: "잘못된 요청 데이터입니다." };
+    }
 
     const { intent, teamId, position, char, anonId, claimerName } = result.data;
     const finalClaimerName = claimerName || "익명";
@@ -102,7 +108,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 select: { gameState: true },
             });
 
-            if (!session) throw new Error("No session");
+            if (!session) throw new Error("Game session not found.");
 
             const currentGameState: GameState = session.gameState as unknown as GameState;
             const updatedGameState = JSON.parse(JSON.stringify(currentGameState));
@@ -110,30 +116,32 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const team = updatedGameState.teams.find((t: GameTeam) => t.id === teamId);
             const entry = team?.entries.find((e: GameEntry) => e.position === position);
 
-            if (!team || !entry) throw new Error("Invalid target");
+            if (!team || !entry) throw new Error("유효하지 않은 팀 또는 자리입니다.");
 
             let responseMessage = "";
             let status = 200;
 
             switch (intent) {
                 case "occupy":
-                    // [선점 로직] 남이 이미 먹었으면 실패 (내가 아닐 때만)
+                    // 🚨 [뺏기 방지] 이미 주인이 있고(null 아님), 그게 내가 아니라면 실패
                     if (entry.claimerId && entry.claimerId !== anonId) {
-                        responseMessage = "이미 선점된 자리입니다.";
-                        status = 409;
+                        responseMessage = "이미 다른 사용자가 선택했습니다.";
+                        status = 409; // Conflict Error
                     } else {
+                        // 빈 자리거나 내 자리면 점유 성공
                         entry.claimerId = anonId;
                         entry.claimerName = finalClaimerName;
-                        responseMessage = "선점 성공";
+                        responseMessage = "자리를 선택했습니다.";
                     }
                     break;
 
                 case "input":
                     if (entry.claimerId !== anonId) {
-                        status = 403; // 뺏김
+                        responseMessage = "자리를 뺏겼습니다.";
+                        status = 403;
                     } else {
                         entry.char = char || "";
-                        responseMessage = "저장됨";
+                        responseMessage = "저장되었습니다.";
                     }
                     break;
 
@@ -142,11 +150,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         entry.claimerId = null;
                         entry.claimerName = null;
                         entry.char = "";
+                        responseMessage = "해제되었습니다.";
+                    } else {
+                        status = 403;
                     }
                     break;
             }
 
-            if (status !== 200) return { success: false, message: responseMessage };
+            if (status !== 200) {
+                return { success: false, message: responseMessage };
+            }
 
             await prisma.gameSession.update({
                 where: { id: sessionId },
@@ -159,42 +172,42 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         return updateResult;
 
     } catch (error) {
-        return { error: "Error" };
+        console.error("Game Action Failed:", error);
+        return { error: "서버 처리 중 오류가 발생했습니다." };
     }
 };
 
 // ------------------------------------------------------------------
-// 4. COMPONENT
+// 4. COMPONENT (UI 렌더링)
 // ------------------------------------------------------------------
 
 export default function GamePlayPage() {
-    const { isRevealed, gameState } = useLoaderData<typeof loader>();
+    const { isRevealed, gameState } = useLoaderData<any>();
     const revalidator = useRevalidator();
     const fetcher = useFetcher();
 
     const [anonId, setAnonId] = useState<string>('');
     const [claimerName, setClaimerName] = useState<string>('');
+    const [inputName, setInputName] = useState<string>('');
 
-    // 상태
     const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
     const [myPosition, setMyPosition] = useState<number | null>(null);
     const [myChar, setMyChar] = useState("");
 
     const POLLING_INTERVAL = 3000;
 
-    // 🚨 [수정 1] 초기화 & 복구 (딱 한 번만 실행!)
-    // 의존성 배열을 []로 비워서, 폴링이 돌든 말든 처음에만 실행되게 합니다.
+    // [초기화]
     useEffect(() => {
-        // 1. 익명 ID 설정
         let currentAnonId = localStorage.getItem("myAnonId");
         if (!currentAnonId) {
             currentAnonId = generateAnonId();
             localStorage.setItem("myAnonId", currentAnonId);
         }
         setAnonId(currentAnonId);
-        setClaimerName(localStorage.getItem("myClaimerName") || '');
 
-        // 2. 자리 복구
+        const savedName = localStorage.getItem("myClaimerName");
+        if (savedName) setClaimerName(savedName);
+
         const savedTeamId = localStorage.getItem("myGameTeamId");
         const savedPosition = localStorage.getItem("myGamePosition");
 
@@ -203,45 +216,58 @@ export default function GamePlayPage() {
             if (savedPosition) {
                 setMyPosition(Number(savedPosition));
 
-                // 내 글자 불러오기 (최초 1회만)
                 const currentEntry = gameState.teams
-                    .find(t => t.id === Number(savedTeamId))?.entries
-                    .find(e => e.position === Number(savedPosition));
+                    .find((t: any) => t.id === Number(savedTeamId))?.entries
+                    .find((e: any) => e.position === Number(savedPosition));
                 if (currentEntry) setMyChar(currentEntry.char);
             }
         }
-    }, []); // 👈 여기가 핵심! 빈 배열로 둬서 리렌더링 시 실행 방지
+    }, []);
 
-    // [폴링] 데이터 최신화
+    // [폴링]
     useEffect(() => {
         const interval = setInterval(() => {
-            if (document.visibilityState === "visible") revalidator.revalidate();
+            if (document.visibilityState === "visible") {
+                revalidator.revalidate();
+            }
         }, POLLING_INTERVAL);
         return () => clearInterval(interval);
     }, [revalidator]);
 
-    // 🚨 [수정 2] 상태 감지 (튕겨남 체크만 수행, 글자 덮어쓰기 X)
+    // [상태 감지]
     useEffect(() => {
         if (!selectedTeamId || !myPosition || !anonId) return;
 
         const currentEntry = gameState.teams
-            .find(t => t.id === selectedTeamId)?.entries
-            .find(e => e.position === myPosition);
+            .find((t: any) => t.id === selectedTeamId)?.entries
+            .find((e: any) => e.position === myPosition);
 
         if (!currentEntry) return;
 
-        // 누군가 내 자리를 뺏었거나 리셋된 경우에만 반응
+        // 다른 사람이 선점했으면 쫓아냄
         if (currentEntry.claimerId && currentEntry.claimerId !== anonId) {
             setMyPosition(null);
             localStorage.removeItem("myGamePosition");
             alert("다른 사용자가 선점했습니다.");
         }
-        // 💡 중요: 여기서 setMyChar를 호출하지 않음으로써 입력 중인 글자를 보호합니다.
     }, [gameState, selectedTeamId, myPosition, anonId]);
 
     // --------------------------------------------------------
     // 핸들러
     // --------------------------------------------------------
+
+    const handleConfirmName = (e?: React.FormEvent) => {
+        e?.preventDefault();
+        if (inputName.trim()) {
+            setClaimerName(inputName);
+            localStorage.setItem("myClaimerName", inputName);
+        }
+    };
+
+    const handleEditName = () => {
+        setInputName(claimerName);
+        setClaimerName('');
+    };
 
     const handleSelectTeam = (teamId: number) => {
         setSelectedTeamId(teamId);
@@ -249,20 +275,22 @@ export default function GamePlayPage() {
     };
 
     const handleSelectPosition = (position: number) => {
-        if (!anonId || !selectedTeamId) return;
+        if (!anonId) return;
+
+        const targetTeamId = selectedTeamId || gameState.teams[0].id;
+        if (!selectedTeamId) setSelectedTeamId(targetTeamId);
 
         fetcher.submit({
-            intent: "occupy", teamId: selectedTeamId, position, anonId, claimerName
+            intent: "occupy", teamId: targetTeamId, position, anonId, claimerName
         }, { method: "post" });
 
         setMyPosition(position);
         localStorage.setItem("myGamePosition", position.toString());
         localStorage.setItem("myClaimerName", claimerName);
 
-        // 자리를 새로 잡을 때만 서버 값으로 초기화
         const currentEntry = gameState.teams
-            .find(t => t.id === selectedTeamId)?.entries
-            .find(e => e.position === position);
+            .find((t: any) => t.id === targetTeamId)?.entries
+            .find((e: any) => e.position === position);
         if (currentEntry) setMyChar(currentEntry.char);
     };
 
@@ -281,8 +309,10 @@ export default function GamePlayPage() {
     };
 
     const handleSave = () => {
-        if (selectedTeamId && myPosition && anonId) {
-            fetcher.submit({ intent: "input", teamId: selectedTeamId, position: myPosition, char: myChar, anonId }, { method: "post" });
+        const finalChar = myChar.trim().slice(-1);
+        if (selectedTeamId && myPosition && anonId && finalChar) {
+            fetcher.submit({ intent: "input", teamId: selectedTeamId, position: myPosition, char: finalChar, anonId }, { method: "post" });
+            setMyChar(finalChar);
         }
     };
 
@@ -290,11 +320,8 @@ export default function GamePlayPage() {
     // 화면 렌더링
     // --------------------------------------------------------
 
-    const currentTeam = gameState.teams.find(t => t.id === selectedTeamId);
-
-    // 저장 여부 확인 (UI 표시용)
-    const currentEntryState = currentTeam?.entries.find(e => e.position === myPosition);
-    // 🚨 내 로컬 값(myChar)과 서버 값(currentEntryState.char)이 같으면 저장된 것
+    const currentTeam = gameState.teams.find((t: any) => t.id === selectedTeamId);
+    const currentEntryState = currentTeam?.entries.find((e: any) => e.position === myPosition);
     const isSaved = currentEntryState?.char === myChar && myChar !== "";
 
     // 화면 1: 이름 입력
@@ -304,26 +331,39 @@ export default function GamePlayPage() {
                 <Card className="w-full shadow-lg">
                     <CardHeader><CardTitle className="text-center">이름을 입력하세요</CardTitle></CardHeader>
                     <CardContent>
-                        <Input
-                            autoFocus
-                            placeholder="닉네임 (예: 홍길동)"
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    const val = (e.target as HTMLInputElement).value;
-                                    if (val.trim()) {
-                                        setClaimerName(val);
-                                        localStorage.setItem("myClaimerName", val);
-                                    }
-                                }
-                            }}
-                            className="text-center text-lg h-12 mb-4"
-                        />
-                        <p className="text-center text-sm text-gray-500">입력 후 엔터를 누르세요</p>
+                        <form onSubmit={handleConfirmName} className="flex flex-col gap-4">
+                            <Input
+                                autoFocus
+                                placeholder="닉네임 (예: 홍길동)"
+                                value={inputName}
+                                onChange={(e) => setInputName(e.target.value)}
+                                className="text-center text-lg h-12"
+                            />
+                            <Button
+                                type="submit"
+                                className="w-full h-12 text-lg font-bold bg-indigo-600 hover:bg-indigo-700"
+                                disabled={!inputName.trim()}
+                            >
+                                시작하기
+                            </Button>
+                        </form>
                     </CardContent>
                 </Card>
             </div>
         );
     }
+
+    const UserHeader = () => (
+        <div className="w-full flex justify-end mb-4 px-2">
+            <button
+                onClick={handleEditName}
+                className="flex items-center gap-2 text-sm text-slate-500 hover:text-indigo-600 bg-white px-3 py-1.5 rounded-full shadow-sm border border-slate-200 transition-colors"
+            >
+                <span className="font-bold text-slate-800">{claimerName}</span> 님
+                <Edit className="w-3 h-3" />
+            </button>
+        </div>
+    );
 
     // 화면 2: 팀 선택
     const showTeamSelect = !selectedTeamId && gameState.teams.length > 1;
@@ -331,9 +371,10 @@ export default function GamePlayPage() {
     if (showTeamSelect) {
         return (
             <div className="container mx-auto max-w-md min-h-screen py-8 px-4 bg-slate-50 flex flex-col items-center">
+                <UserHeader />
                 <h1 className="text-2xl font-bold mb-8 text-slate-800">팀을 선택하세요</h1>
                 <div className="w-full space-y-4">
-                    {gameState.teams.map(team => (
+                    {gameState.teams.map((team: any) => (
                         <Button
                             key={team.id}
                             onClick={() => handleSelectTeam(team.id)}
@@ -354,6 +395,8 @@ export default function GamePlayPage() {
     if (!myPosition) {
         return (
             <div className="container mx-auto max-w-md min-h-screen py-8 px-4 bg-slate-50 flex flex-col items-center">
+                <UserHeader />
+
                 <div className="w-full flex items-center mb-8 relative justify-center">
                     {gameState.teams.length > 1 && (
                         <Button variant="ghost" size="icon" className="absolute left-0" onClick={handleBackToTeams}>
@@ -364,24 +407,22 @@ export default function GamePlayPage() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 w-full">
-                    {activeTeam?.entries.map(entry => {
+                    {activeTeam?.entries.map((entry: any) => {
                         const isTaken = entry.claimerId !== null;
                         const isMySpot = entry.claimerId === anonId;
 
                         return (
                             <Button
                                 key={entry.position}
+                                // 🚨 [핵심] 남이 먹은 자리(isTaken && !isMySpot)는 클릭 불가(disabled)
                                 disabled={isTaken && !isMySpot}
-                                onClick={() => {
-                                    if (!selectedTeamId) setSelectedTeamId(gameState.teams[0].id);
-                                    handleSelectPosition(entry.position);
-                                }}
+                                onClick={() => handleSelectPosition(entry.position)}
                                 className={`
                                     h-24 text-2xl font-black shadow-md transition-all border-2
                                     ${isMySpot
                                         ? "bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700"
                                         : isTaken
-                                            ? "bg-slate-200 text-slate-400 border-slate-200 cursor-not-allowed"
+                                            ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed" // 비활성 스타일
                                             : "bg-white text-slate-800 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50"
                                     }
                                 `}
@@ -389,6 +430,7 @@ export default function GamePlayPage() {
                                 <div className="flex flex-col items-center">
                                     <span className="text-3xl">{entry.position}</span>
                                     <span className="text-sm font-normal opacity-80">
+                                        {/* 텍스트도 '선점됨'으로 표시 */}
                                         {isTaken ? (isMySpot ? "나의 선택" : (entry.claimerName || "선점됨")) : "선택 가능"}
                                     </span>
                                 </div>
@@ -427,17 +469,18 @@ export default function GamePlayPage() {
                             value={myChar}
                             onChange={(e) => setMyChar(e.target.value)}
                             className={`
-        w-full h-full text-center font-black border-4 rounded-[2.5rem] shadow-2xl caret-transparent p-0 leading-none
-        text-[140px] 
-        focus:ring-8 focus:ring-indigo-100 transition-all duration-300
-        ${isSaved
+                                w-full h-full text-center font-black border-4 rounded-[2.5rem] shadow-2xl caret-transparent p-0 leading-none
+                                text-[140px] 
+                                focus:ring-8 focus:ring-indigo-100 transition-all duration-300
+                                ${isSaved
                                     ? 'border-green-500 bg-green-50 text-green-600'
                                     : 'border-slate-300 bg-white text-slate-800'
                                 }
-    `}
-                            // 🚨 [수정] 모바일 키보드 오류 방지를 위한 필수 속성들
-
-                            maxLength={1}
+                            `}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            spellCheck="false"
+                            autoCapitalize="off"
                             autoFocus
                             placeholder="?"
                         />
