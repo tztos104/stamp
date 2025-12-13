@@ -180,15 +180,7 @@ model Review {
 }
 
 model GameSession {
-  id    String @id @default(uuid())
-  char1 String @default("")
-  char2 String @default("")
-  char3 String @default("")
-
-  // 자리 선점 여부 (true면 누가 들어와 있음)
-  isTaken1 Boolean @default(false)
-  isTaken2 Boolean @default(false)
-  isTaken3 Boolean @default(false)
-
-  updatedAt DateTime @updatedAt
+  id         Int     @id @default(autoincrement())
+  isRevealed Boolean @default(false) // 정답 공개 여부
+  gameState  Json // 모든 팀의 상태와 제출 글자를 유연하게 담습니다.
 }

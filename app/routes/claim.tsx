@@ -28,7 +28,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // loader에서 action을 호출하는 방법
     // React Router의 action 함수를 직접 호출하되,
     // request 객체를 생성하여 action에 필요한 데이터를 전달합니다.
-  const response = await action({
+    const response = await action({
       request: new Request(request.url, {
         method: 'POST',
         body: formData,
@@ -95,7 +95,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       if (new Date() > claimableStamp.expiresAt) {
         throw new Error("만료된 스탬프 코드입니다.");
       }
-   
+
       if (claimableStamp.redemptions.length > 0) {
         throw new Error("이미 사용한 스탬프 코드입니다.");
       }
