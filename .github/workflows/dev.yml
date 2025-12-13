@@ -42,7 +42,7 @@ jobs:
 
       # 🌟 4. DB 마이그레이션
       - name: DB Migration
-        run: pnpm prisma migrate deploy
+        run: pnpm prisma db push
 
       # 🌱 5. DB 시딩 - ⭐ 추가된 부분!
       - name: DB Seed
