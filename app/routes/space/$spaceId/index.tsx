@@ -208,14 +208,28 @@ export default function SpaceMain() {
                         <button
                             onClick={toggleOpenAll}
                             className={`
-                                text-xs px-3 py-1.5 rounded-full font-bold shadow-lg flex items-center gap-1 transition
-                                ${globalCardState === 1
+        text-xs px-3 py-1.5 rounded-full font-bold shadow-lg flex items-center gap-1 transition
+        ${globalCardState === 1
                                     ? "bg-slate-700 hover:bg-slate-600 text-white"
                                     : "bg-indigo-600/80 hover:bg-indigo-500 text-white"
                                 }
-                            `}
+    `}
                         >
-                            {globalCardState === 1 ? <><FolderClosed size={14} /> 접기</> : <><FolderOpen size={14} /> {isMobile ? "리스트" : "모두 펴기"}</>}
+                            {globalCardState === 1 ? (
+                                <>
+                                    <FolderClosed size={14} />
+                                    {/* 접기 버튼도 안전하게 CSS 처리 */}
+                                    <span className="md:hidden">접기</span>
+                                    <span className="hidden md:inline">모두 접기</span>
+                                </>
+                            ) : (
+                                <>
+                                    <FolderOpen size={14} />
+                                    {/* 🚨 여기가 에러 났던 부분! CSS로 수정 */}
+                                    <span className="md:hidden">리스트</span>
+                                    <span className="hidden md:inline">모두 펴기</span>
+                                </>
+                            )}
                         </button>
                     )}
 
