@@ -63,3 +63,4 @@ jobs:
           npm install -g pm2
           pm2 startOrReload ecosystem.config.cjs --env development
           pm2 save
+          pm2 restart

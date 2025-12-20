@@ -1,8 +1,7 @@
 @import "tailwindcss";
 
-@plugin "tailwindcss-animate";
 @import "tw-animate-css";
-
+@config "../tailwind.config.ts";
 @custom-variant dark (&:is(.dark *));
 
 @theme {
@@ -130,6 +129,7 @@ body {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
