@@ -14,9 +14,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function action({ request, params }: ActionFunctionArgs) {
     const { user } = await getSession(request);
+    console.log("현재 액션을 수행하는 유저:", user);
     const uploadHandler = unstable_createMemoryUploadHandler({ maxPartSize: 50_000_000 });
     const formData = await unstable_parseMultipartFormData(request, uploadHandler);
-
+    console.log("현재 액션을 수행하는 유저:", formData);
     // 1. 입력 데이터 가져오기 (비밀번호 없음!)
     const type = formData.get("type") as "MESSAGE" | "ALBUM";
     const nickname = formData.get("nickname") as string;
