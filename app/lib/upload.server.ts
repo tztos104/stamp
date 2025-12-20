@@ -1,69 +1,83 @@
-// app/lib/upload.server.ts (S3 업로드 방식으로 수정)
-
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import axios from "axios";
 import sharp from "sharp";
 
-// S3 클라이언트 초기화. 
-// AWS 자격 증명(Access Key, Secret Key)은 환경 변수에서 자동으로 읽어옵니다.
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION!,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  }
-});
+// 1. 기본 서버 주소 (http://192.168.0.200:4000 또는 https://img.tcroom.kr)
+const STORAGE_BASE_URL = process.env.STORAGE_SERVER_URL;
+const INTERNAL_UPLOAD_URL = "http://192.168.0.200:4000";
+const PUBLIC_VIEW_URL = "https://img.tcroom.kr";
 
-const BUCKET_NAME = process.env.S3_BUCKET_NAME!;
+// 3. 최종 업로드 엔드포인트 조립 (예: http://.../upload/dev)
+const UPLOAD_ENDPOINT = `${STORAGE_BASE_URL}`;
 
-/**
- * 업로드된 이미지 파일을 WebP 형식으로 변환하여 S3에 업로드하고,
- * 해당 파일의 URL을 반환합니다.
- * @param file 업로드된 File 객체
- * @returns 저장된 파일의 URL 경로 (예: https://bucket-name.s3.region.amazonaws.com/uploads/image.webp)
- */
-async function processAndUploadImage(file: File): Promise<string | null> {
+export async function processAndUploadImage(file: File): Promise<string | null> {
   if (!file || file.size === 0) return null;
 
   try {
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
-    // sharp를 사용해 이미지를 리사이징하고 WebP 버퍼로 변환
     const optimizedBuffer = await sharp(buffer)
-      .rotate() 
+      .rotate()
       .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 80 })
       .toBuffer();
 
-    const filename = `uploads/image-${Date.now()}-${Math.round(Math.random() * 1E9)}.webp`;
+    const filename = `image-${Date.now()}-${Math.round(Math.random() * 1E9)}.webp`;
 
-    // S3에 업로드하기 위한 명령어 생성
-    const command = new PutObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: filename,
-      Body: optimizedBuffer,
-      ContentType: 'image/webp',
-      
+    const formData = new FormData();
+    const blob = new Blob([new Uint8Array(optimizedBuffer)], { type: 'image/webp' });
+    formData.append('file', blob, filename);
+
+    // 🚨 [핵심 변경] 쿼리 스트링 없이 깔끔한 주소로 전송
+    const { data } = await axios.post(`${INTERNAL_UPLOAD_URL}/upload/local`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
 
-    // S3로 명령어 전송 (업로드 실행)
-    await s3Client.send(command);
+    if (data.success) {
+      // 리턴값: https://img.tcroom.kr/images/dev/파일.webp
+      return `${PUBLIC_VIEW_URL}${data.url}`;
+    }
 
-    // 업로드된 파일의 최종 URL 반환
-    return `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${filename}`;
+    return null;
 
   } catch (error) {
-    console.error("S3 업로드 실패:", error);
+    console.error("클라우드 서버 업로드 실패:", error);
     return null;
   }
 }
 
-/**
- * 여러 개의 이미지 파일을 받아 처리하고 URL 배열을 반환합니다.
- * @param files File 객체의 배열
- * @returns 저장된 파일들의 URL 경로 배열
- */
 export async function uploadImages(files: File[]): Promise<string[]> {
-    const uploadPromises = files.map(file => processAndUploadImage(file));
-    const urls = await Promise.all(uploadPromises);
-    return urls.filter((url): url is string => url !== null);
+  const uploadPromises = files.map(file => processAndUploadImage(file));
+  const urls = await Promise.all(uploadPromises);
+  return urls.filter((url): url is string => url !== null);
+}
+
+/**
+ * 저장소 서버에 있는 이미지 파일을 삭제합니다.
+ * @param fullUrl 예: https://img.tcroom.kr/images/prod/file.webp
+ */
+export async function deleteImage(fullUrl: string) {
+  if (!fullUrl) return;
+
+  try {
+    // 전체 URL에서 도메인을 떼고 경로만 추출 (/images/prod/file.webp)
+    const urlObj = new URL(fullUrl);
+    const pathOnly = urlObj.pathname;
+
+    // 200번 서버 삭제 API 호출
+    await axios.delete(`${STORAGE_BASE_URL}/delete`, {
+      data: { path: pathOnly }, // Body에 경로 전달
+    });
+
+  } catch (error) {
+    // 이미지가 이미 없거나 에러가 나도, DB 삭제는 진행되어야 하므로 로그만 남김
+    console.error(`이미지 삭제 실패 (${fullUrl}):`, error);
+  }
+}
+
+/**
+ * 여러 이미지를 한 번에 삭제
+ */
+export async function deleteImages(urls: string[]) {
+  await Promise.all(urls.map(url => deleteImage(url)));
 }

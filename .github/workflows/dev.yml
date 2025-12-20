@@ -14,6 +14,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - name: Clean Previous Build Artifacts
+        run: |
+          rm -rf node_modules
+          rm -rf build
+          rm -rf .react-router
+          rm -rf .cache
+          pnpm store prune
       - uses: pnpm/action-setup@v3
         with:
           version: 9
@@ -42,7 +49,7 @@ jobs:
 
       # 🌟 4. DB 마이그레이션
       - name: DB Migration
-        run: pnpm prisma migrate deploy
+        run: pnpm prisma db push
 
       # 🌱 5. DB 시딩 - ⭐ 추가된 부분!
       - name: DB Seed
@@ -54,5 +61,6 @@ jobs:
       - name: PM2 Reload (Development)
         run: |
           npm install -g pm2
-          pm2 reload ecosystem.config.cjs --env development || pm2 start ecosystem.config.cjs --env development
+          pm2 startOrReload ecosystem.config.cjs --env development
           pm2 save
+          pm2 restart

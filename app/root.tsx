@@ -6,9 +6,9 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router";
-import { LocalizationProvider } from '@mui/x-date-pickers'; 
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'; 
-import {ko} from 'date-fns/locale/ko'; // 
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { ko } from 'date-fns/locale/ko'; // 
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -23,6 +23,10 @@ export const links: Route.LinksFunction = () => [
   {
     rel: "stylesheet",
     href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+  },
+  {
+    rel: "stylesheet",
+    href: "https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap", // 나눔 펜 스크립트 (귀여운 손글씨)
   },
 ];
 
@@ -45,9 +49,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return  <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
-          <Outlet />
-        </LocalizationProvider>;
+  return <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ko}>
+    <Outlet />
+  </LocalizationProvider>;
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

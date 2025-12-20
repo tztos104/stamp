@@ -38,6 +38,8 @@ model User {
   StampCard                StampCard[]
   reviews                  Review[]
   ClaimableStampRedemption ClaimableStampRedemption[]
+  memorySpaces             MemorySpace[]
+  memoryPosts              MemoryPost[]
 }
 
 model Session {
@@ -180,15 +182,46 @@ model Review {
 }
 
 model GameSession {
-  id    String @id @default(uuid())
-  char1 String @default("")
-  char2 String @default("")
-  char3 String @default("")
+  id         Int     @id @default(autoincrement())
+  isRevealed Boolean @default(false) // 정답 공개 여부
+  gameState  Json // 모든 팀의 상태와 제출 글자를 유연하게 담습니다.
+}
 
-  // 자리 선점 여부 (true면 누가 들어와 있음)
-  isTaken1 Boolean @default(false)
-  isTaken2 Boolean @default(false)
-  isTaken3 Boolean @default(false)
+// --- 생일 롤링페이퍼 & 앨범(Memory) 관련 모델 ---
 
-  updatedAt DateTime @updatedAt
+model MemorySpace {
+  id         String   @id @default(uuid())
+  title      String // "000 생일 축하해"
+  targetDate DateTime // 12월 25일 (이 날짜 전엔 못 들어감)
+  password   String // "0000" (생일자 접속용 비번)
+
+  // AI가 분석한 '별자리 배치 정보'를 저장하는 JSON (전체 맵)
+  starMap Json? // { "posts": [{id:1, x:10, y:20}, ...] }
+
+  posts     MemoryPost[]
+  createdAt DateTime     @default(now())
+  user      User?        @relation(fields: [userId], references: [id])
+  userId    String?
+}
+
+model MemoryPost {
+  id      Int         @id @default(autoincrement())
+  spaceId String
+  space   MemorySpace @relation(fields: [spaceId], references: [id])
+
+  type     String // "MESSAGE" (롤링페이퍼) | "PHOTO" (앨범)
+  content  String? // 내용
+  mediaUrl String? // 사진 URL
+
+  // 작성자 정보
+  writerId String? // 로그인한 유저 ID (비회원이면 null)
+  writer   User?   @relation(fields: [writerId], references: [id])
+
+  //
+  nickname String // "지나가던 친구" (필수)
+
+  // 개별 스타일 (AI가 분석한 감정, 색상 등)
+  aiStyle   Json?
+  password  String?
+  createdAt DateTime @default(now())
 }

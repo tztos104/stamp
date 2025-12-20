@@ -21,7 +21,7 @@ export default [
     route("events/:id", "routes/events/$id.tsx"),
     route("claim", "routes/claim.tsx"),
     route("mypage", "routes/mypage.tsx"),
-
+    route("memory/new", "routes/memory/new.tsx"),
     // 추후 이 레이아웃을 사용하는 다른 페이지가 생기면 여기에 추가하면 됩니다.
     // 예: route("my-page", "routes/my-page.tsx"),s
     ...prefix("forgot-password", [
@@ -31,6 +31,21 @@ export default [
     ]),
 
   ]),
+
+  ...prefix("space", [
+    // 📂 routes/space/index.tsx (전체 우주 목록/대시보드)
+    index("routes/space/index.tsx"),
+
+    // 📂 routes/space/$spaceId/... (개별 우주 상세)
+    ...prefix(":spaceId", [
+      index("routes/space/$spaceId/index.tsx"),      // 메인 화면
+      route("write", "routes/space/$spaceId/write.tsx"), // 글쓰기
+      route("admin", "routes/space/$spaceId/admin.tsx"), // 관리자
+      route("mine", "routes/space/$spaceId/mine.tsx"),   // 내 글 목록
+      route("success", "routes/space/$spaceId/success.tsx"), // 성공 화면
+    ]),
+  ]),
+
   route("admin", "routes/admin/_layout.tsx", [
     index("routes/admin/index.tsx"),
 
@@ -56,6 +71,7 @@ export default [
     route("play", "routes/game/play.tsx"),
     route("host", "routes/game/host.tsx"),
   ]),
+
   route("api/categories", "routes/api/categories.ts"),
   route("api/users/search", "routes/api/users/search.ts"),
   route("api/users/check", "routes/api/users/check.ts"),
