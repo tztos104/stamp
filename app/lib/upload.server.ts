@@ -40,18 +40,12 @@ export async function processAndUploadImage(file: File): Promise<string | null> 
     const targetPath = urlObj.pathname;
     const internalUploadUrl = `${INTERNAL_HOST}${targetPath}`;
 
-    // [디버깅] 실제로 요청하는 주소 출력
-    console.log(`🚀 [Upload] 요청 시작: ${internalUploadUrl}`);
-    console.log(`ℹ️ [Upload] 타겟 폴더: ${targetPath}`);
 
     // 전송
     const { data } = await axios.post(internalUploadUrl, formData, {
-      // [중요] Node.js 환경에서 Axios가 헤더를 못 잡을 경우를 대비해 명시 (보통은 자동이지만 안전하게)
-      headers: {
-        "Content-Type": "multipart/form-data"
-      }
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 10000 // 👈 5000(5초) -> 60000(1분)으로 변경!
     });
-
     if (data.success) {
       console.log(`✅ [Upload] 성공! 리턴 URL: ${PUBLIC_VIEW_ROOT}${data.url}`);
       return `${PUBLIC_VIEW_ROOT}${data.url}`;
