@@ -29,24 +29,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const userId = flashSession.get("passwordResetUserId");
 
   if (!userId) {
-      flashSession.flash("toast", { type: "error", message: "사용자 정보가 없습니다. 다시 시도해주세요." });
-      return redirect("/forgot-password", { headers: { "Set-Cookie": await commitSession(flashSession) } });
+    flashSession.flash("toast", { type: "error", message: "사용자 정보가 없습니다. 다시 시도해주세요." });
+    return redirect("/forgot-password", { headers: { "Set-Cookie": await commitSession(flashSession) } });
   }
 
   const hashedPassword = hashPassword(password);
 
-  await db.key.update({
-      where: { id: `password:${userId}` }, // Lucia v3+ 방식에서는 key 테이블을 업데이트합니다.
-      data: { hashedPassword: hashedPassword }
-  });
+  await db.key.updateMany({
+    where: {
+      userId: userId
 
+    },
+    data: { hashedPassword: hashedPassword }
+  });
   // 사용된 세션 정보를 모두 삭제합니다.
   flashSession.unset("verificationCode");
   flashSession.unset("passwordResetUserId");
   flashSession.unset("isVerifiedForPasswordReset");
 
   flashSession.flash("toast", { type: "success", message: "비밀번호가 성공적으로 변경되었습니다. 다시 로그인해주세요." });
-  
+
   return redirect("/login", {
     headers: { "Set-Cookie": await commitSession(flashSession) },
   });
