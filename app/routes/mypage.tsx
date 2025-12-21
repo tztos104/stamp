@@ -207,9 +207,6 @@ export default function MyPage() {
                       </p>
                     </div>
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
-                      <span className="text-xs text-slate-400 flex items-center gap-1">
-                        <MessageSquare className="w-3 h-3" /> 메시지 {space._count.posts}개
-                      </span>
                       <div className="flex gap-2">
                         <Link to={`/space/${space.id}`} className="text-xs bg-white border border-slate-200 px-2 py-1.5 rounded-md font-bold hover:bg-slate-100 flex items-center gap-1">
                           <ExternalLink className="w-3 h-3" /> 입장
