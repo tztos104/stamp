@@ -1,28 +1,85 @@
 import axios from "axios";
 import sharp from "sharp";
-
+import exifr from "exifr";
 // 1. 환경 변수 체크
 const ENV_UPLOAD_URL = process.env.STORAGE_SERVER_URL || "";
 const INTERNAL_HOST = "http://192.168.0.200:4000";
 const PUBLIC_VIEW_ROOT = "https://img.tcroom.kr";
-
-export async function processAndUploadImage(file: File): Promise<string | null> {
-  // [디버깅] 파일이 들어왔는지 확인
-  if (!file || file.size === 0) {
-    console.log("❌ [Upload] 파일이 비어있음");
-    return null;
-  }
-
-  // [디버깅] 환경변수 확인
-  if (!ENV_UPLOAD_URL) {
-    console.error("❌ [Upload] .env에 STORAGE_SERVER_URL이 없습니다! (현재값 비어있음)");
-    return null;
-  }
+interface ExifrOutput {
+  DateTimeOriginal?: Date | string;
+  CreateDate?: Date | string;
+  ModifyDate?: Date | string;
+  DateCreated?: Date | string; // XMP에서 주로 사용
+  DateTime?: Date | string;
+  [key: string]: unknown;
+}
+export async function processAndUploadImage(file: File): Promise<{ url: string; takenAt: Date | null } | null> {
+  if (!file || file.size === 0) return null;
+  if (!ENV_UPLOAD_URL) return null;
 
   try {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    let takenAt: Date | null = null;
+
+    // --- [Step 1] exifr로 메타데이터 추출 (PNG/XMP 지원) ---
+    try {
+      // exifr는 buffer를 직접 받아서 파싱합니다.
+      // mergeOutput: false로 하면 exif, xmp 등이 분리되지만, true(기본값)면 합쳐져서 찾기 편합니다.
+      const metadata = await exifr.parse(buffer, {
+        tiff: true,
+        xmp: true,  // ✨ PNG는 XMP에 날짜가 있을 확률이 높음
+        icc: false,
+        iptc: true,
+        jfif: true,
+      }) as ExifrOutput | undefined;
+
+      if (metadata) {
+
+        // 날짜 후보군 (우선순위 순)
+        const candidates = [
+          metadata.DateTimeOriginal,
+          metadata.CreateDate,
+          metadata.DateCreated, // XMP에서 날짜 저장하는 필드
+          metadata.DateTime,
+          metadata.ModifyDate
+        ];
+
+        for (const dateRaw of candidates) {
+          if (!dateRaw) continue;
+
+          // exifr는 설정을 안 건드리면 Date 객체로 자동 변환해서 주는 경우가 많음
+          if (dateRaw instanceof Date) {
+            takenAt = dateRaw;
+            break;
+          }
+
+          // 문자열로 들어온 경우 파싱
+          if (typeof dateRaw === 'string') {
+            // ISO 포맷 변환 (2022:09:17 -> 2022-09-17)
+            const isoString = dateRaw.replace(/^(\d{4})[:.](\d{2})[:.](\d{2})/, '$1-$2-$3');
+            const parsedDate = new Date(isoString);
+            if (!isNaN(parsedDate.getTime())) {
+              takenAt = parsedDate;
+              break;
+            }
+          }
+        }
+      } else {
+        console.log("⚠️ [EXIF] 메타데이터가 발견되지 않음");
+      }
+    } catch (e: unknown) {
+      console.warn(`⚠️ 메타데이터 파싱 실패: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // --- [Step 2] Fallback (파일 수정일) ---
+    if (!takenAt) {
+      console.warn("⚠️ [최종 경고] 메타데이터 없음. 파일의 lastModified 사용.");
+      takenAt = new Date(file.lastModified || Date.now());
+    }
+
+    // --- [Step 3] 이미지 리사이징 및 업로드 (기존과 동일) ---
     const optimizedBuffer = await sharp(buffer)
       .rotate()
       .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
@@ -30,51 +87,38 @@ export async function processAndUploadImage(file: File): Promise<string | null> 
       .toBuffer();
 
     const filename = `image-${Date.now()}-${Math.round(Math.random() * 1E9)}.webp`;
-
     const formData = new FormData();
     const blob = new Blob([new Uint8Array(optimizedBuffer)], { type: 'image/webp' });
     formData.append('file', blob, filename);
 
-    // URL 생성 로직
     const urlObj = new URL(ENV_UPLOAD_URL);
-    const targetPath = urlObj.pathname;
-    const internalUploadUrl = `${INTERNAL_HOST}${targetPath}`;
-
-
-    // 전송
-    const { data } = await axios.post(internalUploadUrl, formData, {
+    const { data } = await axios.post(`${INTERNAL_HOST}${urlObj.pathname}`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
-      timeout: 10000 // 👈 5000(5초) -> 60000(1분)으로 변경!
+      timeout: 60000
     });
-    if (data.success) {
-      console.log(`✅ [Upload] 성공! 리턴 URL: ${PUBLIC_VIEW_ROOT}${data.url}`);
-      return `${PUBLIC_VIEW_ROOT}${data.url}`;
-    }
 
-    console.error(`❌ [Upload] 서버 응답 에러:`, data);
+    if (data.success) {
+      return { url: `${PUBLIC_VIEW_ROOT}${data.url}`, takenAt };
+    }
     return null;
 
-  } catch (error: any) {
-    // [디버깅] 상세 에러 출력
-    console.error("❌ [Upload] 통신 중 치명적 오류 발생");
-    if (error.code === 'ECONNREFUSED') {
-      console.error("👉 원인: 200번 서버(192.168.0.200)가 꺼져있거나 포트가 막혔습니다.");
-    } else if (axios.isAxiosError(error) && error.response) {
-      console.error(`👉 서버 응답(${error.response.status}):`, error.response.data);
-    } else {
-      console.error("👉 에러 내용:", error.message);
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      console.error("👉 [Upload Error]", error.message);
+    } else if (error instanceof Error) {
+      console.error("👉 [Error]", error.message);
     }
     return null;
   }
 }
-
 // ... 나머지 함수들(uploadImages, deleteImage 등)은 그대로 두셔도 됩니다.
-export async function uploadImages(files: File[]): Promise<string[]> {
+export async function uploadImages(files: File[]): Promise<{ url: string; takenAt: Date | null }[]> {
   const uploadPromises = files.map(file => processAndUploadImage(file));
-  const urls = await Promise.all(uploadPromises);
-  return urls.filter((url): url is string => url !== null);
-}
+  const results = await Promise.all(uploadPromises);
 
+  // 결과가 null이 아닌 것만 필터링하고, 타입스크립트에게 구체적인 객체 형태임을 알려줍니다.
+  return results.filter((result): result is { url: string; takenAt: Date | null } => result !== null);
+}
 export async function deleteImage(fullUrl: string) {
   if (!fullUrl) return;
   try {

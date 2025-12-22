@@ -110,6 +110,9 @@ importers:
       exif-parser:
         specifier: ^0.1.12
         version: 0.1.12
+      exifr:
+        specifier: ^7.1.3
+        version: 7.1.3
       fs-jetpack:
         specifier: ^5.1.0
         version: 5.1.0
@@ -186,6 +189,9 @@ importers:
       '@types/bcrypt':
         specifier: ^6.0.0
         version: 6.0.0
+      '@types/exif-reader':
+        specifier: ^2.0.2
+        version: 2.0.2
       '@types/node':
         specifier: ^20.19.17
         version: 20.19.17
@@ -2232,6 +2238,10 @@ packages:
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
+  '@types/exif-reader@2.0.2':
+    resolution: {integrity: sha512-p6KWhw3nlLQ5Zhr/ZHP93IEY6LT4dldw1A5qB3Hw3Cw81bFVupoC4kkKYAXk+HfVQbT8+RJ1r8OS6w2xMT5Gww==}
+    deprecated: This is a stub types definition. exif-reader provides its own type definitions, so you do not need this installed.
+
   '@types/node@20.19.17':
     resolution: {integrity: sha512-gfehUI8N1z92kygssiuWvLiwcbOB3IRktR6hTDgJlXMYh5OvkPSRmgfoBUmfZt+vhwJtX7v1Yw4KvvAf7c5QKQ==}
 
@@ -2838,6 +2848,12 @@ packages:
 
   exif-parser@0.1.12:
     resolution: {integrity: sha512-c2bQfLNbMzLPmzQuOr8fy0csy84WmwnER81W88DzTp9CYNPJ6yzOj2EZAh9pywYpqHnshVLHQJ8WzldAyfY+Iw==}
+
+  exif-reader@2.0.3:
+    resolution: {integrity: sha512-zFbQvguwT9JkqyYhR7pjE1Yn8SagwaGLNRU0Oh14xFa1paSf5Gzxn4gxgk0XhnudI0UIqU+HgnBX93+nva592A==}
+
+  exifr@7.1.3:
+    resolution: {integrity: sha512-g/aje2noHivrRSLbAUtBPWFbxKdKhgj/xr1vATDdUXPOFYJlQ62Ft0oy+72V6XLIpDJfHs6gXLbBLAolqOXYRw==}
 
   exit-hook@2.2.1:
     resolution: {integrity: sha512-eNTPlAD67BmP31LDINZ3U7HSF8l57TxOY2PmBJ1shpCvpnxBF93mWCE8YHBnXs8qiUZJc9WDcWIeC3a2HIAMfw==}
@@ -6758,6 +6774,10 @@ snapshots:
 
   '@types/estree@1.0.8': {}
 
+  '@types/exif-reader@2.0.2':
+    dependencies:
+      exif-reader: 2.0.3
+
   '@types/node@20.19.17':
     dependencies:
       undici-types: 6.21.0
@@ -7345,6 +7365,10 @@ snapshots:
   events@3.3.0: {}
 
   exif-parser@0.1.12: {}
+
+  exif-reader@2.0.3: {}
+
+  exifr@7.1.3: {}
 
   exit-hook@2.2.1: {}
 

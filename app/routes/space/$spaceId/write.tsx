@@ -6,65 +6,91 @@ import { processAndUploadImage } from "~/lib/upload.server";
 import { unstable_createMemoryUploadHandler, unstable_parseMultipartFormData } from "@remix-run/node";
 import { getSession } from "~/lib/auth.server";
 import { myPostsCookie } from "~/lib/cookies.server";
-import { Sparkles, Image as ImageIcon, Calendar, Info } from "lucide-react"; // ✨ 아이콘 추가
+import { Sparkles, Image as ImageIcon, Calendar, Plus, Trash2, X } from "lucide-react";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
     const { user } = await getSession(request);
-
-    // ✨ [수정] targetDate(공개일)도 함께 가져옵니다.
     const space = await db.memorySpace.findUnique({
         where: { id: params.spaceId },
-        include: {
-            user: { select: { name: true } }
-        }
+        include: { user: { select: { name: true } } }
     });
-
     if (!space) throw new Response("Not Found", { status: 404 });
-
     return { user, space };
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
     const { user } = await getSession(request);
-    const uploadHandler = unstable_createMemoryUploadHandler({ maxPartSize: 50_000_000 });
+
+    // ⚠️ 대량 업로드 시 메모리 주의 (50MB 제한은 파일 '개당'이 아니라 파트당 적용되나, 총량 고려 필요)
+    const uploadHandler = unstable_createMemoryUploadHandler({ maxPartSize: 100_000_000 });
     const formData = await unstable_parseMultipartFormData(request, uploadHandler);
 
     const type = formData.get("type") as "MESSAGE" | "ALBUM";
     const nickname = formData.get("nickname") as string;
-    const content = formData.get("content") as string;
-    const file = formData.get("photo") as File;
 
-    let mediaUrl = null;
-    let finalType = type;
+    // DB에 저장된 게시글 ID들을 모을 배열
+    const createdPostIds: string[] = [];
 
-    if (type === "ALBUM") {
-        if (file && file.size > 0) {
-            mediaUrl = await processAndUploadImage(file);
-        } else {
-            finalType = "MESSAGE";
-        }
+    if (type === "MESSAGE") {
+        // [기존 로직] 메시지는 하나만 저장
+        const content = formData.get("content") as string;
+        const newPost = await db.memoryPost.create({
+            data: {
+                spaceId: params.spaceId!,
+                type: "MESSAGE",
+                content,
+                nickname,
+                writerId: user?.id || null,
+            }
+        });
+        createdPostIds.push(String(newPost.id));
+
+    } else if (type === "ALBUM") {
+        // ✨ [수정] 앨범은 여러 장을 한꺼번에 처리 (getAll 사용)
+        const photos = formData.getAll("photo") as File[];
+        const contents = formData.getAll("content") as string[];
+
+        // 병렬 처리를 위해 Promise.all 사용 (순서대로 사진 업로드 -> DB 저장)
+        await Promise.all(photos.map(async (file, index) => {
+            // 파일이 없거나 0바이트면 건너뜀
+            if (!file || file.size === 0) return;
+
+            const uploadResult = await processAndUploadImage(file);
+            // 업로드 실패 시 해당 건은 스킵
+            if (!uploadResult) return;
+            const { url, takenAt } = uploadResult;
+            // 사진 순서에 맞는 설명 가져오기 (없으면 빈 문자열)
+            const content = contents[index] || "";
+            const finalDate = takenAt ? new Date(takenAt) : new Date();
+            const newPost = await db.memoryPost.create({
+                data: {
+                    spaceId: params.spaceId!,
+                    type: "ALBUM",
+                    content: content,
+                    mediaUrl: url,
+                    nickname: nickname,
+                    writerId: user?.id || null,
+                    createdAt: finalDate
+                }
+            });
+            createdPostIds.push(String(newPost.id));
+        }));
     }
 
-    const newPost = await db.memoryPost.create({
-        data: {
-            spaceId: params.spaceId!,
-            type: finalType,
-            content: content,
-            mediaUrl: mediaUrl,
-            nickname: nickname,
-            writerId: user?.id || null,
-        }
-    });
+    // 쿠키 업데이트 (새로 생긴 ID들을 모두 추가)
+    if (createdPostIds.length > 0) {
+        const cookieHeader = request.headers.get("Cookie");
+        const myPostIds = (await myPostsCookie.parse(cookieHeader)) || [];
+        const updatedIds = [...myPostIds, ...createdPostIds];
 
-    const cookieHeader = request.headers.get("Cookie");
-    const myPostIds = (await myPostsCookie.parse(cookieHeader)) || [];
-    const updatedIds = [...myPostIds, newPost.id];
+        // 성공 페이지로 이동 (마지막에 만든 ID 하나만 파라미터로 넘김, 혹은 그냥 성공 페이지로)
+        return redirect(`/space/${params.spaceId}/success?postId=${createdPostIds[0]}`, {
+            headers: { "Set-Cookie": await myPostsCookie.serialize(updatedIds) },
+        });
+    }
 
-    return redirect(`/space/${params.spaceId}/success?postId=${newPost.id}`, {
-        headers: {
-            "Set-Cookie": await myPostsCookie.serialize(updatedIds),
-        },
-    });
+    // 실패 혹은 아무것도 저장 안됨
+    return redirect(`/space/${params.spaceId}`);
 }
 
 export default function WritePage() {
@@ -73,45 +99,54 @@ export default function WritePage() {
     const isSubmitting = navigation.state === "submitting";
 
     const [tab, setTab] = useState<"MESSAGE" | "ALBUM">("MESSAGE");
-    const [preview, setPreview] = useState<string | null>(null);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setPreview(URL.createObjectURL(file));
-        } else {
-            setPreview(null);
+    // ✨ [추가] 사진 여러 장 관리를 위한 State
+    // 각 항목은 고유 ID를 가짐 (화면 렌더링용)
+    const [photoItems, setPhotoItems] = useState([{ id: Date.now(), preview: null as string | null }]);
+
+    // 항목 추가 (최대 10장 제한)
+    const addPhotoItem = () => {
+        if (photoItems.length >= 10) {
+            alert("최대 10장까지 한 번에 올릴 수 있어요!");
+            return;
         }
+        setPhotoItems([...photoItems, { id: Date.now(), preview: null }]);
+    };
+
+    // 항목 삭제
+    const removePhotoItem = (targetId: number) => {
+        if (photoItems.length === 1) {
+            alert("최소 1장은 있어야 해요!");
+            return;
+        }
+        setPhotoItems(photoItems.filter(item => item.id !== targetId));
+    };
+
+    // 파일 미리보기 업데이트
+    const handleFileChange = (id: number, e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        setPhotoItems(prev => prev.map(item => {
+            if (item.id === id) {
+                return { ...item, preview: file ? URL.createObjectURL(file) : null };
+            }
+            return item;
+        }));
     };
 
     const recipient = space.user?.name || space.title;
-
-    // ✨ 날짜 포맷팅 (예: 12월 25일)
     const openDate = new Date(space.targetDate).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
 
     return (
         <div className="min-h-screen bg-slate-50 p-4 flex items-center justify-center">
-            <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-6 relative overflow-hidden">
+            <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-6 relative">
 
-                {/* 1. 상단 수신자 정보 */}
-                <div className="bg-slate-100 p-5 rounded-t-xl -mx-6 -mt-6 mb-6 text-center border-b border-slate-200 flex flex-col items-center justify-center min-h-[80px]">
-                    {space.user ? (
-                        /* 👤 유저가 연결된 경우: "TO. OOO에게" */
-                        <>
-
-                            <h1 className="text-xl font-bold text-slate-800">
-                                <span className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">TO.</span> {space.user.name}<span className="font-normal text-sm ml-1">에게</span>
-                            </h1>
-                        </>
-                    ) : (
-                        /* 🏷️ 유저가 없는 경우: "방 제목"만 표시 */
-                        <h1 className="text-xl font-bold text-slate-800 break-keep">
-                            {space.title}
-                        </h1>
-                    )}
+                {/* 1. 상단 정보 (생략 가능하나 문맥 유지를 위해 포함) */}
+                <div className="bg-slate-100 p-5 rounded-t-xl -mx-6 -mt-6 mb-6 text-center border-b border-slate-200">
+                    <h1 className="text-xl font-bold text-slate-800">
+                        {space.user ? <>{space.user.name}<span className="font-normal text-sm ml-1">에게</span></> : space.title}
+                    </h1>
                 </div>
 
-                {/* 2. ✨ 안내 메시지 (타임캡슐 컨셉 설명) */}
                 <div className="mb-6 bg-indigo-50 border border-indigo-100 rounded-lg p-3 flex items-start gap-3">
                     <Calendar className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
                     <div className="text-sm text-indigo-800">
@@ -120,7 +155,7 @@ export default function WritePage() {
                     </div>
                 </div>
 
-                {/* 3. 탭 선택 */}
+                {/* 탭 버튼 */}
                 <div className="flex bg-slate-100 p-1 rounded-lg mb-4">
                     <button type="button" onClick={() => setTab("MESSAGE")} className={`flex-1 py-2 text-sm font-bold rounded transition-all flex items-center justify-center gap-1 ${tab === "MESSAGE" ? "bg-white shadow text-indigo-600" : "text-slate-500"}`}>
                         <Sparkles size={14} /> 편지 쓰기
@@ -130,77 +165,87 @@ export default function WritePage() {
                     </button>
                 </div>
 
-                {/* 4. ✨ 탭별 설명 문구 추가 */}
-                <div className="text-center mb-6">
-                    {tab === "MESSAGE" ? (
-                        <p className="text-xs text-slate-400 animate-fade-in">
-                            작성하신 편지는 {recipient}님의 우주에서<br />
-                            <span className="text-indigo-500 font-bold">하나의 반짝이는 별⭐</span>이 되어 떠오릅니다.
-                        </p>
-                    ) : (
-                        <p className="text-xs text-slate-400 animate-fade-in">
-                            업로드한 사진은 {recipient}님의 앨범에<br />
-                            <span className="text-pink-500 font-bold">감성적인 폴라로이드 사진📸</span>으로 남게 됩니다.
-                        </p>
-                    )}
-                </div>
-
-                <Form method="post" encType="multipart/form-data" className="space-y-4">
+                <Form method="post" encType="multipart/form-data" className="space-y-6">
                     <input type="hidden" name="type" value={tab} />
 
+                    {/* 공통: 작성자 이름 */}
                     <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">보내는 사람</label>
-                        <input
-                            name="nickname"
-                            defaultValue={user?.name || ""}
-                            placeholder="닉네임을 입력하세요"
-                            className="w-full border p-3 rounded bg-slate-50 focus:outline-indigo-500 transition-all focus:bg-white focus:border-indigo-300"
-                            required
-                        />
+                        <input name="nickname" defaultValue={user?.name || ""} placeholder="닉네임" className="w-full border p-3 rounded bg-slate-50 focus:outline-indigo-500" required />
                     </div>
 
                     {tab === "MESSAGE" ? (
+                        /* 메시지 모드 (기존과 동일) */
                         <div>
                             <label className="block text-xs font-bold text-slate-500 mb-1">메시지</label>
-                            <textarea
-                                name="content"
-                                rows={5}
-                                placeholder={space.user
-                                    ? `${space.user.name}님에게 축하의 메시지를 남겨주세요.`
-                                    : "이곳에 축하와 응원의 메시지를 남겨주세요."
-                                }
-                                className="w-full border p-3 rounded resize-none focus:outline-indigo-500 transition-all focus:bg-white focus:border-indigo-300"
-                                required
-                            />
+                            <textarea name="content" rows={5} placeholder="축하 메시지를 남겨주세요" className="w-full border p-3 rounded resize-none focus:outline-indigo-500" required />
                         </div>
                     ) : (
-                        <>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">사진 선택</label>
-                                <div className={`border-2 border-dashed ${preview ? 'border-indigo-300 bg-indigo-50' : 'border-slate-300 hover:bg-slate-50'} p-4 text-center rounded relative min-h-[150px] flex flex-col items-center justify-center transition-all cursor-pointer group`}>
-                                    {preview ? (
-                                        <img src={preview} alt="Preview" className="max-h-[200px] mx-auto rounded object-contain shadow-sm" />
-                                    ) : (
-                                        <div className="text-slate-400 text-sm group-hover:text-slate-600 transition-colors">
-                                            <span className="text-2xl block mb-1">📷</span>
-                                            <span className="font-bold text-slate-500">사진을 꾹 눌러 선택하세요</span>
+                        /* ✨ 사진 모드 (여러 장 업로드 UI) */
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                                <label className="block text-xs font-bold text-slate-500">사진 목록 ({photoItems.length}/10)</label>
+                                <button type="button" onClick={addPhotoItem} className="text-xs flex items-center gap-1 font-bold text-pink-600 hover:text-pink-700 transition">
+                                    <Plus size={14} /> 사진 추가하기
+                                </button>
+                            </div>
+
+                            {/* 사진 입력 카드 리스트 */}
+                            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1 scrollbar-hide">
+                                {photoItems.map((item, index) => (
+                                    <div key={item.id} className="relative border rounded-lg p-3 bg-slate-50 flex gap-3 animate-fade-in items-start">
+                                        {/* 삭제 버튼 */}
+                                        {photoItems.length > 1 && (
+                                            <button type="button" onClick={() => removePhotoItem(item.id)} className="absolute top-2 right-2 text-slate-400 hover:text-red-500 transition">
+                                                <X size={16} />
+                                            </button>
+                                        )}
+
+                                        {/* 왼쪽: 사진 미리보기 및 입력 */}
+                                        <div className="shrink-0">
+                                            <div className={`w-20 h-20 rounded border-2 border-dashed flex items-center justify-center relative bg-white overflow-hidden ${item.preview ? 'border-pink-300' : 'border-slate-300'}`}>
+                                                {item.preview ? (
+                                                    <img src={item.preview} alt="preview" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <span className="text-slate-300 text-2xl">📷</span>
+                                                )}
+                                                <input
+                                                    type="file"
+                                                    name="photo" /* 중요: name이 모두 photo여야 배열로 넘어감 */
+                                                    accept="image/*"
+                                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                                    onChange={(e) => handleFileChange(item.id, e)}
+                                                    required
+                                                />
+                                            </div>
                                         </div>
-                                    )}
-                                    <input type="file" name="photo" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={handleFileChange} required />
-                                </div>
+
+                                        {/* 오른쪽: 설명 입력 */}
+                                        <div className="flex-1 pt-1">
+                                            <div className="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">
+                                                <span className="bg-slate-200 text-slate-600 px-1.5 rounded text-[10px]">{index + 1}</span>
+                                                사진 설명
+                                            </div>
+                                            <input
+                                                name="content" /* 중요: name이 모두 content여야 배열로 넘어감 */
+                                                placeholder="사진에 대한 설명 (선택)"
+                                                className="w-full border p-2 text-sm rounded focus:outline-pink-500"
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">사진 설명 (선택)</label>
-                                <input name="content" placeholder="사진에 대한 짧은 코멘트" className="w-full border p-3 rounded focus:outline-pink-500 transition-all focus:bg-white focus:border-pink-300" />
-                            </div>
-                        </>
+
+                            <button type="button" onClick={addPhotoItem} className="w-full py-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 font-bold hover:border-pink-300 hover:text-pink-500 hover:bg-pink-50 transition flex items-center justify-center gap-2">
+                                <Plus size={18} /> 사진 더 추가하기
+                            </button>
+                        </div>
                     )}
 
-                    <button disabled={isSubmitting} className={`w-full text-white py-3.5 rounded-xl font-bold transition shadow-lg disabled:opacity-50 disabled:shadow-none transform active:scale-[0.98] ${tab === "MESSAGE" ? "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200" : "bg-pink-600 hover:bg-pink-700 shadow-pink-200"}`}>
-                        {isSubmitting ? "전송 중..." : (tab === "MESSAGE" ? "🚀 별 띄우기" : "📸 앨범에 저장하기")}
+                    <button disabled={isSubmitting} className={`w-full text-white py-3.5 rounded-xl font-bold shadow-lg transition disabled:opacity-50 ${tab === "MESSAGE" ? "bg-indigo-600 hover:bg-indigo-700" : "bg-pink-600 hover:bg-pink-700"}`}>
+                        {isSubmitting ? "업로드 중..." : (tab === "MESSAGE" ? "🚀 별 띄우기" : `📸 사진 ${photoItems.length}장 저장하기`)}
                     </button>
                 </Form>
-
             </div>
         </div>
     );
