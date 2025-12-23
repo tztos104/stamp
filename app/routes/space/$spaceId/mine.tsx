@@ -4,20 +4,32 @@ import { db } from "~/lib/db.server";
 import { getSession } from "~/lib/auth.server";
 import { myPostsCookie } from "~/lib/cookies.server";
 
+interface PostItem {
+    id: number;
+    nickname: string;
+    type: string;
+    content: string;
+    mediaUrl: string | null;
+    createdAt: string; // loader를 거쳐오면 Date가 string(ISO형식)으로 변합니다.
+}
 export async function loader({ request, params }: LoaderFunctionArgs) {
     const { user } = await getSession(request);
 
-    // 1. 쿠키 확인: "이 기기에서 쓴 글 번호들 줘봐"
+    // 1. 쿠키 확인
     const cookieHeader = request.headers.get("Cookie");
-    const myPostIds = (await myPostsCookie.parse(cookieHeader)) || [];
+    // 쿠키에는 문자열로 저장됨 (예: ["1", "2"])
+    const myPostIdsStr = (await myPostsCookie.parse(cookieHeader)) || [];
 
-    // 2. DB 조회: 내 아이디로 썼거나, 내 쿠키에 있는 글들
+    // ✨ [핵심 수정] DB 조회를 위해 문자열 ID들을 숫자로 변환
+    const myPostIds = myPostIdsStr.map((id: string) => Number(id)).filter((n: number) => !isNaN(n));
+
+    // 2. DB 조회
     const myPosts = await db.memoryPost.findMany({
         where: {
             spaceId: params.spaceId,
             OR: [
-                ...(user ? [{ writerId: user.id }] : []), // 로그인 유저
-                { id: { in: myPostIds } } // 비회원 (쿠키 인증)
+                ...(user ? [{ writerId: user.id }] : []),
+                { id: { in: myPostIds } }
             ]
         },
         orderBy: { createdAt: "desc" },
@@ -35,8 +47,10 @@ export async function action({ request }: ActionFunctionArgs) {
     const myPostIds = (await myPostsCookie.parse(cookieHeader)) || [];
     const { user } = await getSession(request);
 
-    // 2. 삭제 권한 확인 (쿠키에 있거나, 내 아이디로 쓴 글이면 통과)
-    const canDelete = myPostIds.includes(postId) ||
+    // 2. 삭제 권한 확인
+    // ✨ [핵심 수정] 쿠키(문자열 리스트)에 postId(숫자)가 있는지 확인할 때 문자열로 변환해서 비교
+    const canDelete =
+        myPostIds.includes(String(postId)) ||
         (user && (await db.memoryPost.findFirst({ where: { id: postId, writerId: user.id } })));
 
     if (!canDelete) {
@@ -71,7 +85,7 @@ export default function MyPostsPage() {
                     </div>
                 ) : (
                     <ul className="space-y-4">
-                        {myPosts.map((post) => (
+                        {myPosts.map((post: PostItem) => (
                             <li key={post.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
                                 <div className="flex justify-between items-center mb-3">
                                     <div className="flex items-center gap-2">
