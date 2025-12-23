@@ -17,11 +17,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     const cookieHeader = request.headers.get("Cookie");
     const myPostIds = (await myPostsCookie.parse(cookieHeader)) || [];
 
-    const isMine = (user && user.id === post.writerId) || myPostIds.includes(post.id);
+    // ✨ [핵심 수정] 쿠키에 있는 ID(문자열)와 비교하기 위해 post.id(숫자)를 문자열로 변환
+    const isMine =
+        (user && user.id === post.writerId) ||
+        myPostIds.includes(String(post.id));
 
     // 내 글이 아니면 볼 수 없음 (보안)
     if (!isMine) {
-        throw new Response("Unauthorized", { status: 401 });
+        throw new Response("권한이 없습니다. (본인이 쓴 글만 확인할 수 있어요)", { status: 401 });
     }
 
     return { post, spaceId: params.spaceId };
@@ -29,6 +32,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export default function SuccessPage() {
     const { post, spaceId } = useLoaderData<typeof loader>();
+
+    // 날짜 포맷 (한국식)
+    const formattedDate = new Date(post.createdAt).toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
 
     return (
         <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -48,19 +58,28 @@ export default function SuccessPage() {
                     {post.type === "ALBUM" ? (
                         // 📸 폴라로이드 스타일
                         <div className="bg-white p-3 pb-8 shadow-lg rotate-1 transform transition hover:rotate-0 duration-300">
-                            <div className="bg-slate-100 overflow-hidden mb-3 aspect-square">
-                                <img src={post.mediaUrl || ""} alt="" className="w-full h-full object-cover" />
+                            <div className="bg-slate-100 overflow-hidden mb-3 aspect-square relative flex items-center justify-center">
+                                {/* ✨ [수정] 이미지가 있을 때만 렌더링 */}
+                                {post.mediaUrl ? (
+                                    <img
+                                        src={post.mediaUrl}
+                                        alt="추억 사진"
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <span className="text-slate-400 text-xs">이미지 없음</span>
+                                )}
                             </div>
-                            <p className="font-handwriting text-slate-800 text-xl">{post.content}</p>
+                            <p className="font-handwriting text-slate-800 text-xl break-keep">{post.content}</p>
                             <p className="text-xs text-right text-slate-400 mt-2">- {post.nickname}</p>
                         </div>
                     ) : (
                         // 💌 메시지 카드 스타일
                         <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-xl text-white shadow-lg text-left relative overflow-hidden">
                             <div className="absolute top-0 right-0 p-4 opacity-20 text-4xl">❝</div>
-                            <p className="text-lg font-medium leading-relaxed relative z-10">"{post.content}"</p>
+                            <p className="text-lg font-medium leading-relaxed relative z-10 break-keep">"{post.content}"</p>
                             <div className="mt-4 flex justify-between items-end border-t border-white/20 pt-3">
-                                <span className="text-xs opacity-70">{new Date(post.createdAt).toLocaleDateString()}</span>
+                                <span className="text-xs opacity-70">{formattedDate}</span>
                                 <span className="font-bold text-sm">From. {post.nickname}</span>
                             </div>
                         </div>
