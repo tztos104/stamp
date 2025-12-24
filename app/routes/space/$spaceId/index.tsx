@@ -43,7 +43,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (!space) return { error: "방이 존재하지 않습니다.", posts: null };
 
     const now = new Date();
-    if (now < new Date(space.targetDate)) {
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+    const kstGap = 9 * 60 * 60 * 1000; // 9시간
+    const kstNow = new Date(utc + kstGap);
+    if (kstNow < new Date(space.targetDate)) {
         return { error: "아직 공개 날짜가 되지 않았습니다!", posts: null };
     }
 
@@ -65,7 +68,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     if (!space) throw new Response("Not Found", { status: 404 });
 
     const now = new Date();
-    const isDatePassed = now >= new Date(space.targetDate);
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+    const kstGap = 9 * 60 * 60 * 1000; // 9시간
+    const kstNow = new Date(utc + kstGap);
+
+    // 한국 시간 기준으로 날짜가 지났는지 판단
+    const isDatePassed = kstNow >= new Date(space.targetDate);
 
     // 관리자(ADMIN) 체크 추가
     const isAdmin = user?.role === "ADMIN";
@@ -196,7 +204,7 @@ export default function SpaceMain() {
 
             <div className="absolute top-0 left-0 w-full z-40 flex justify-between px-6 py-6 items-center pointer-events-none">
                 <div className="pointer-events-auto">
-                    <h1 className="font-bold text-xl md:base drop-shadow-md bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                    <h1 className="font-bold text-xl md:basedrop-shadow-md bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
                         {space.title}
                     </h1>
                     {isOwner && isDatePassed && <span className="text-[10px] text-pink-400 font-bold block">Welcome Back! 👑</span>}
