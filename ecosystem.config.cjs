@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name: "stamp",
+    name: "stamp-prod",
     // ✅ 수정 1: server.js 대신 npm start 명령어를 실행 (가장 확실함)
     script: "pnpm",
     args: "start",
