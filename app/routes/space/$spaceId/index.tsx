@@ -196,7 +196,7 @@ export default function SpaceMain() {
 
             <div className="absolute top-0 left-0 w-full z-40 flex justify-between px-6 py-6 items-center pointer-events-none">
                 <div className="pointer-events-auto">
-                    <h1 className="font-bold text-xl drop-shadow-md bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                    <h1 className="font-bold text-xl md:base drop-shadow-md bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
                         {space.title}
                     </h1>
                     {isOwner && isDatePassed && <span className="text-[10px] text-pink-400 font-bold block">Welcome Back! 👑</span>}
@@ -219,14 +219,14 @@ export default function SpaceMain() {
                                 <>
                                     <FolderClosed size={14} />
                                     {/* 접기 버튼도 안전하게 CSS 처리 */}
-                                    <span className="md:hidden">접기</span>
+
                                     <span className="hidden md:inline">모두 접기</span>
                                 </>
                             ) : (
                                 <>
                                     <FolderOpen size={14} />
                                     {/* 🚨 여기가 에러 났던 부분! CSS로 수정 */}
-                                    <span className="md:hidden">리스트</span>
+
                                     <span className="hidden md:inline">모두 펴기</span>
                                 </>
                             )}
