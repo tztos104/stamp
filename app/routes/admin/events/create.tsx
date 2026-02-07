@@ -132,7 +132,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const newEvent = await prisma.event.create({
         data: {
           name, description, isAllDay, startDate, endDate,
-          images: { create: imageUrls.map(url => ({ url })), },
+          images: { create: imageUrls.map((imageObj: any) => ({ url: imageObj.url })), },
           categoryId: Number(categoryId),
         },
         select: { id: true, endDate: true, name: true },
